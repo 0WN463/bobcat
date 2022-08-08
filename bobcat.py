@@ -25,7 +25,6 @@ else:
     CONFIG_DIR = Path.home()
     CONFIG_FILE = os.path.join(CONFIG_DIR, '.bobcat.ini')
 
-
 SKIP_DIR = os.path.join(os.environ.get('XDG_STATE_HOME'), 'bobcat') \
         if 'XDG_STATE_HOME' in os.environ \
         else os.path.join(Path.home(), '.local', 'state', 'bobcat')
@@ -51,28 +50,6 @@ secret_conf = configparser.ConfigParser()
 secret_conf.read(os.path.join(CONFIG_DIR, '.secret.ini'))
 LANGUAGE_CONF = config["languages"]
 LANGUAGE_CONF = {k: literal_eval(v) for k, v in LANGUAGE_CONF.items()}
-
-class AuthError(Exception):
-    pass
-
-def login(username: str, password: str):
-    LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
-    s = requests.Session()
-    data = {"user": username, "password": password, "script": True}
-
-    res = s.post(LOGIN_URL, data=data)
-
-    if res.status_code != 200:
-        raise AuthError("Unable to login")
-
-    return s
-
-
-@dataclass
-class Problem:
-    title: str
-    path: str
-    difficulty: str
 
 @dataclass
 class Language:
@@ -101,6 +78,28 @@ LANGUAGES = [
                 LANGUAGE_CONF['c++']['exec'],
                 )
         ]
+
+class AuthError(Exception):
+    pass
+
+def login(username: str, password: str):
+    LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
+    s = requests.Session()
+    data = {"user": username, "password": password, "script": True}
+
+    res = s.post(LOGIN_URL, data=data)
+
+    if res.status_code != 200:
+        raise AuthError("Unable to login")
+
+    return s
+
+
+@dataclass
+class Problem:
+    title: str
+    path: str
+    difficulty: str
 
 def get_lang(file: str, languages:list[Language]=LANGUAGES) -> Language | None:
     ext = Path(file).suffix
@@ -175,6 +174,36 @@ def submit(s, problem_path, source_file) -> int:
         raise ValueError()
 
     return int(m.group(1))
+
+
+def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
+    lang = get_lang(solution_file)
+
+    if not lang:
+        raise ValueError("Unsupported language")
+
+    in_files = sorted(glob.glob(f'{test_case_dir}/*.in'))
+
+    for file in in_files:
+        out_file = file.replace("in", "out")
+        ans_file = file.replace("in", "ans")
+
+        build_cmd = lang.build_cmd.format(sol=solution_file, cache_dir=test_case_dir)
+        subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+
+        run_cmd = lang.run_cmd.format(source_file=solution_file, cache_dir=test_case_dir)
+        run_cmd = f'{run_cmd} < {file}'
+        out = subprocess.Popen(run_cmd, shell=True, stdout=subprocess.PIPE).stdout.read().decode('ascii')
+
+        print(f"Input: ")
+
+        with open(file, 'r') as f:
+            print(f.read())
+
+        print("Output: ")
+        print(out)
+
+
 
 def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     lang = get_lang(solution_file)
@@ -268,6 +297,11 @@ if __name__ == '__main__':
 
             if local_test(solution_file):
                 print(f"Passed all test cases")
+        elif m := re.match(r'(r|R)(\s+(\S*))?', key):
+            solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
+            print(f"Running {solution_file}")
+            local_run(solution_file)
+
         elif m := re.match(r'(s|S)(\s+(\S*))?', key):
             solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
             print(f"Submitting {solution_file}")
