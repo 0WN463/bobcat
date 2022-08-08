@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import glob
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +14,7 @@ import urllib.parse
 import getpass
 import shutil
 import subprocess
+from ast import literal_eval
 
 config = configparser.ConfigParser()
 
@@ -47,6 +49,8 @@ Path(CACHE_DIR).mkdir( parents=True, exist_ok=True )
 
 secret_conf = configparser.ConfigParser()
 secret_conf.read(os.path.join(CONFIG_DIR, '.secret.ini'))
+LANGUAGE_CONF = config["languages"]
+LANGUAGE_CONF = {k: literal_eval(v) for k, v in LANGUAGE_CONF.items()}
 
 class AuthError(Exception):
     pass
@@ -81,19 +85,20 @@ LANGUAGES = [
             Language(
                 "Python 3", 
                 ".py", 
-                '',
-                'python {sol} < {in_file} > {out_file}'),
+                LANGUAGE_CONF['python']['build'],
+                LANGUAGE_CONF['python']['exec'],
+            ),
             Language(
                 "Haskell", 
                 ".hs", 
-                '',
-                'runghc {sol} < {in_file} > {out_file}',
+                LANGUAGE_CONF['haskell']['build'],
+                LANGUAGE_CONF['haskell']['exec'],
                 ),
             Language(
                 "C++", 
                 ".cpp", 
-                'g++ -o {cache_dir}/main {sol}',
-                '{cache_dir}/main < {in_file} > {out_file}',
+                LANGUAGE_CONF['c++']['build'],
+                LANGUAGE_CONF['c++']['exec'],
                 )
         ]
 
@@ -114,13 +119,10 @@ def get_probs(s) -> list[Problem]:
         difficulty=tr.findAll('td')[6].span.text) 
         for tr in trs]
 
-
-
 def download_samples(s, path: str, save_to=CACHE_DIR) -> None:
     shutil.rmtree(save_to)
     Path(save_to).mkdir( parents=True, exist_ok=True )
     SAMPLE_URL = urllib.parse.urljoin(HOST, f"{path}/file/statement/samples.zip")
-    print(SAMPLE_URL)
     r = s.get(SAMPLE_URL, stream=True)
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         z.extractall(save_to)
@@ -190,8 +192,9 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
         build_cmd = lang.build_cmd.format(sol=solution_file, cache_dir=test_case_dir)
         subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
 
-        run_cmd = lang.run_cmd.format(sol=solution_file, in_file=file, out_file=out_file, cache_dir= test_case_dir)
-        subprocess.Popen(run_cmd , shell=True, stdout=subprocess.PIPE).wait()
+        run_cmd = lang.run_cmd.format(source_file=solution_file, cache_dir=test_case_dir)
+        diff_cmd = f'{run_cmd} < {file} > {out_file}'
+        subprocess.Popen(diff_cmd, shell=True, stdout=subprocess.PIPE).wait()
 
         diff = subprocess.Popen(f'diff --unified {ans_file} {out_file}', shell=True, stdout=subprocess.PIPE).stdout.read().decode('ascii')
 
@@ -246,7 +249,6 @@ if __name__ == '__main__':
     probs = [ p for p in probs if p.path not in skipped_questions ]
     prob = probs[index]
     show_prob(prob)
-    print(skipped_questions)
 
     while True:
         key = input("Enter command: ")
