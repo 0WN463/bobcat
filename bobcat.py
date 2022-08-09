@@ -14,6 +14,8 @@ import shutil
 import subprocess
 import language
 import config
+import os
+
 
 conf, secret_conf, skipped_questions = config.get_conf()
 
@@ -221,6 +223,7 @@ def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
 
 if __name__ == '__main__':
     def show_prob(prob):
+        os.system('clear')
         desc, samples = get_prob(s, prob.path)
         download_samples(s, prob.path)
 
@@ -258,17 +261,20 @@ if __name__ == '__main__':
             prob = probs[index]
             show_prob(prob)
         elif m := re.match(r'(t|T)(\s+(\S*))?', key):
+            os.system('clear')
             solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
             print(f"Testing {solution_file}")
 
             if local_test(solution_file):
                 print(f"Passed all test cases")
         elif m := re.match(r'(r|R)(\s+(\S*))?', key):
+            os.system('clear')
             solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
             print(f"Running {solution_file}")
             local_run(solution_file)
 
         elif m := re.match(r'(s|S)(\s+(\S*))?', key):
+            os.system('clear')
             solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
             print(f"Submitting {solution_file}")
 
@@ -297,8 +303,10 @@ if __name__ == '__main__':
             prob = probs[index]
             show_prob(prob)
         elif key.upper() == 'H':
+            os.system('clear')
             print(HELP_MSG)
         else:
+            os.system('clear')
             print(f'"{key}" is not a valid command')
             print(HELP_MSG)
 
