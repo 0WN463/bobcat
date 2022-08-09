@@ -25,6 +25,7 @@ CACHE_DIR = conf['config']['cache']
 
 HELP_MSG = f"""
 Commands:
+(i)nfo: show description of current question
 (n)ext: go to next question
 (p)revious: go to previous question
 (s)ubmit [solution_file]: submit solution. Default file: {SOLUTION_FILE}
@@ -252,10 +253,13 @@ if __name__ == '__main__':
     while True:
         key = input("Enter command: ")
 
+
         if key.upper() in ['Q', 'EXIT', 'QUIT']:
             config.save_skipped(skipped_questions)
             exit()
-        if key.upper() in ['>', 'SKIP']:
+        elif key.upper() in ['I', 'INFO']:
+            show_prob(prob)
+        elif key.upper() in ['>', 'SKIP']:
             skipped_questions.append(prob.path)
             probs = [p for p in probs if p.path not in skipped_questions]
             prob = probs[index]
