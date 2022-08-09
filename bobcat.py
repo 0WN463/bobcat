@@ -7,48 +7,21 @@ import zipfile
 import io
 import re
 import time
-import os
-import configparser
 from pathlib import Path
 import urllib.parse
 import getpass
 import shutil
 import subprocess
 import language
+import config
 
-config = configparser.ConfigParser()
+conf, secret_conf, skipped_questions = config.get_conf()
 
-if 'XDG_CONFIG_HOME' in os.environ:
-    CONFIG_DIR = os.path.join(os.environ.get('XDG_CONFIG_HOME'), 'bobcat')
-    CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.ini')
-else:
-    CONFIG_DIR = Path.home()
-    CONFIG_FILE = os.path.join(CONFIG_DIR, '.bobcat.ini')
+HOST = conf['config']["host"]
+SOLUTION_FILE = conf['config']['solution_file']
+CACHE_DIR = conf['config']['cache']
 
-SKIP_DIR = os.path.join(os.environ.get('XDG_STATE_HOME'), 'bobcat') \
-    if 'XDG_STATE_HOME' in os.environ \
-    else os.path.join(Path.home(), '.local', 'state', 'bobcat')
-
-SKIP_FILE = os.path.join(SKIP_DIR, 'skipped')
-
-if os.path.exists(SKIP_FILE):
-    with open(SKIP_FILE, 'r') as f:
-        skipped_questions = f.read().strip().split('\n')
-else:
-    skipped_questions = []
-
-SCRIPT_PATH = os.path.realpath(__file__)
-DEFAULT_CONFIG_FILE = os.path.join(os.path.dirname(SCRIPT_PATH), 'config.ini')
-config.read([DEFAULT_CONFIG_FILE, CONFIG_FILE])
-
-HOST = config['config']["host"]
-SOLUTION_FILE = config['config']['solution_file']
-CACHE_DIR = config['config']['cache']
-
-secret_conf = configparser.ConfigParser()
-secret_conf.read(os.path.join(CONFIG_DIR, '.secret.ini'))
-
-LANGUAGES = language.make_languages(config)
+LANGUAGES = language.make_languages(conf)
 
 
 class AuthError(Exception):
@@ -95,8 +68,12 @@ def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
     SAMPLE_URL = urllib.parse.urljoin(
         HOST, f"{path}/file/statement/samples.zip")
     r = s.get(SAMPLE_URL, stream=True)
-    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-        z.extractall(save_to)
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            z.extractall(save_to)
+    except Exception:
+        print("No samples")
 
 
 def get_prob(s: requests.Session, path: str):
@@ -232,13 +209,6 @@ def get_result(s: requests.Session, submission_id: int) -> (str, str):
     return result, test_cases
 
 
-def on_exit():
-    Path(SKIP_DIR).mkdir(parents=True, exist_ok=True)
-
-    with open(SKIP_FILE, 'w+') as f:
-        f.write("\n".join(skipped_questions))
-
-
 if __name__ == '__main__':
     def show_prob(prob):
         desc, samples = get_prob(s, prob.path)
@@ -270,14 +240,13 @@ if __name__ == '__main__':
         key = input("Enter command: ")
 
         if key.upper() in ['Q', 'EXIT', 'QUIT']:
-            on_exit()
+            config.save_skipped(skipped_questions)
             exit()
         if key.upper() in ['>', 'SKIP']:
             skipped_questions.append(prob.path)
             probs = [p for p in probs if p.path not in skipped_questions]
             prob = probs[index]
             show_prob(prob)
-            print(skipped_questions)
         elif m := re.match(r'(t|T)(\s+(\S*))?', key):
             solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
             print(f"Testing {solution_file}")
