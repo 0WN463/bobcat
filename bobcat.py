@@ -38,8 +38,10 @@ Commands:
 
 LANGUAGES = language.make_languages(conf)
 
+
 class AuthError(Exception):
     pass
+
 
 def login(username: str, password: str):
     LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
@@ -99,16 +101,6 @@ def get_prob(s: requests.Session, path: str) -> tuple[str, list]:
     for p in body.find_all('p'):
         p.replace_with(re.sub(r'\s+', ' ', p.text))
     return body.text.strip(), samples
-
-
-def print_sample(sample, i: int):
-    sample.tr.extract()
-    print(f"Input {i}")
-    print(sample.tr.td.extract().text.strip())
-    print()
-    print(f"Output {i}")
-    print(sample.tr.td.extract().text.strip())
-    print()
 
 
 def submit(s: requests.Session, problem_path, source_file) -> int:
@@ -201,7 +193,7 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
             with open(file, 'r') as f:
                 print(f.read())
-            
+
             print()
 
             print("Diff: ")
@@ -222,6 +214,15 @@ def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
 
 
 if __name__ == '__main__':
+    def print_sample(sample, i: int):
+        sample.tr.extract()
+        print(f"Input {i}")
+        print(sample.tr.td.extract().text.strip())
+        print()
+        print(f"Output {i}")
+        print(sample.tr.td.extract().text.strip())
+        print()
+
     def show_prob(prob):
         os.system('clear')
         desc, samples = get_prob(s, prob.path)
@@ -309,4 +310,3 @@ if __name__ == '__main__':
             os.system('clear')
             print(f'"{key}" is not a valid command')
             print(HELP_MSG)
-
