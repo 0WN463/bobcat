@@ -14,7 +14,7 @@ import urllib.parse
 import getpass
 import shutil
 import subprocess
-from ast import literal_eval
+import language
 
 config = configparser.ConfigParser()
 
@@ -44,42 +44,11 @@ config.read([DEFAULT_CONFIG_FILE, CONFIG_FILE])
 HOST = config['config']["host"]
 SOLUTION_FILE = config['config']['solution_file']
 CACHE_DIR = config['config']['cache']
-Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
 secret_conf = configparser.ConfigParser()
 secret_conf.read(os.path.join(CONFIG_DIR, '.secret.ini'))
-LANGUAGE_CONF = config["languages"]
-LANGUAGE_CONF = {k: literal_eval(v) for k, v in LANGUAGE_CONF.items()}
 
-
-@dataclass
-class Language:
-    name: str  # Sent to Kattis to identify language
-    ext: str
-    build_cmd: str
-    run_cmd: str
-
-
-LANGUAGES = [
-    Language(
-        "Python 3",
-        ".py",
-        LANGUAGE_CONF['python']['build'],
-        LANGUAGE_CONF['python']['exec'],
-    ),
-    Language(
-        "Haskell",
-        ".hs",
-        LANGUAGE_CONF['haskell']['build'],
-        LANGUAGE_CONF['haskell']['exec'],
-    ),
-    Language(
-        "C++",
-        ".cpp",
-        LANGUAGE_CONF['c++']['build'],
-        LANGUAGE_CONF['c++']['exec'],
-    )
-]
+LANGUAGES = language.make_languages(config)
 
 
 class AuthError(Exception):
@@ -106,12 +75,6 @@ class Problem:
     difficulty: str
 
 
-def get_lang(file: str, languages: list[Language] = LANGUAGES) -> Language | None:
-    ext = Path(file).suffix
-    lang = next((lang for lang in languages if lang.ext == ext), None)
-    return lang
-
-
 def get_probs(s) -> list[Problem]:
     PROBLEM_LIST_URL = urllib.parse.urljoin(
         HOST, "/problems?order=%2Bdifficulty_category&show_solved=off&show_tried=on&show_untried=on")
@@ -126,7 +89,7 @@ def get_probs(s) -> list[Problem]:
             for tr in trs]
 
 
-def download_samples(s, path: str, save_to=CACHE_DIR) -> None:
+def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
     shutil.rmtree(save_to)
     Path(save_to).mkdir(parents=True, exist_ok=True)
     SAMPLE_URL = urllib.parse.urljoin(
@@ -136,7 +99,7 @@ def download_samples(s, path: str, save_to=CACHE_DIR) -> None:
         z.extractall(save_to)
 
 
-def get_prob(s, path: str):
+def get_prob(s: requests.Session, path: str):
     r = s.get(f"https://open.kattis.com{path}")
     soup = BeautifulSoup(r.text, features='lxml')
 
@@ -158,16 +121,15 @@ def print_sample(sample, i: int):
     print()
 
 
-def submit(s, problem_path, source_file) -> int:
+def submit(s: requests.Session, problem_path, source_file) -> int:
     with open(source_file, 'r') as f:
         source = f.read()
 
     file_name = Path(source_file).name
-    language = get_lang(source_file)
+    language = LANGUAGES.get_lang(source_file)
 
     if not language:
-        print(f"File extension not supported: {file_name}")
-        return 0
+        raise ValueError(f"File extension not supported: {file_name}")
 
     prob = problem_path.replace('/problems/', '')
     code_file = {"code": source, "filename": file_name,
@@ -184,13 +146,13 @@ def submit(s, problem_path, source_file) -> int:
     m = re.match(r'Submission received\. Submission ID: (\d+)\.', r.text)
 
     if not m:
-        raise ValueError()
+        raise ValueError("Unable to submit solution")
 
     return int(m.group(1))
 
 
 def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
-    lang = get_lang(solution_file)
+    lang = LANGUAGES.get_lang(solution_file)
 
     if not lang:
         raise ValueError("Unsupported language")
@@ -218,10 +180,11 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
 
         print("Output: ")
         print(out)
+        print()
 
 
 def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
-    lang = get_lang(solution_file)
+    lang = LANGUAGES.get_lang(solution_file)
 
     if not lang:
         raise ValueError("Unsupported language")
@@ -254,12 +217,13 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
             print("Diff: ")
             print(diff)
+            print()
             is_correct = False
 
     return is_correct
 
 
-def get_result(s, submission_id: int) -> (str, str):
+def get_result(s: requests.Session, submission_id: int) -> (str, str):
     r = s.get(f'https://open.kattis.com/submissions/{submission_id}')
     soup = BeautifulSoup(r.text, features='lxml')
     result = soup.find('div', class_='status').text
@@ -292,6 +256,7 @@ if __name__ == '__main__':
     user = secret_conf['credentials']['user'] if has_cred else input("User: ")
     password = secret_conf['credentials']['password'] if has_cred else getpass.getpass(
     )
+    Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
     s = login(user, password)
     probs = get_probs(s)
