@@ -76,7 +76,7 @@ def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
         print("No samples")
 
 
-def get_prob(s: requests.Session, path: str):
+def get_prob(s: requests.Session, path: str) -> tuple[str, list]:
     r = s.get(f"https://open.kattis.com{path}")
     soup = BeautifulSoup(r.text, features='lxml')
 
@@ -85,7 +85,7 @@ def get_prob(s: requests.Session, path: str):
 
     for p in body.find_all('p'):
         p.replace_with(re.sub(r'\s+', ' ', p.text))
-    return body, samples
+    return body.text.strip(), samples
 
 
 def print_sample(sample, i: int):
@@ -137,9 +137,6 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
     in_files = sorted(glob.glob(f'{test_case_dir}/*.in'))
 
     for file in in_files:
-        out_file = file.replace("in", "out")
-        ans_file = file.replace("in", "ans")
-
         build_cmd = lang.build_cmd.format(
             sol=solution_file, cache_dir=test_case_dir)
         subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
@@ -191,6 +188,8 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
             with open(file, 'r') as f:
                 print(f.read())
+            
+            print()
 
             print("Diff: ")
             print(diff)
@@ -200,7 +199,7 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     return is_correct
 
 
-def get_result(s: requests.Session, submission_id: int) -> (str, str):
+def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
     r = s.get(f'https://open.kattis.com/submissions/{submission_id}')
     soup = BeautifulSoup(r.text, features='lxml')
     result = soup.find('div', class_='status').text
@@ -216,7 +215,7 @@ if __name__ == '__main__':
 
         print(f"{prob.title} ({prob.difficulty})")
         print()
-        print(desc.text.strip())
+        print(desc)
         print()
         for i, sample in enumerate(samples, start=1):
             print_sample(sample, i)
