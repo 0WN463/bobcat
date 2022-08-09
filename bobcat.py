@@ -22,6 +22,7 @@ conf, secret_conf, skipped_questions = config.get_conf()
 HOST = conf['config']["host"]
 SOLUTION_FILE = conf['config']['solution_file']
 CACHE_DIR = conf['config']['cache']
+LOCAL_TEST = conf['config'].getboolean('local_test')
 
 HELP_MSG = f"""
 Commands:
@@ -282,7 +283,7 @@ if __name__ == '__main__':
             solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
             print(f"Submitting {solution_file}")
 
-            if not local_test(solution_file):
+            if LOCAL_TEST and not local_test(solution_file):
                 if input("Submit anyways? (y/N): ").upper() != 'Y':
                     continue
 
