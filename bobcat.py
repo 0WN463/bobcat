@@ -1,20 +1,20 @@
 #!/usr/bin/python
-import glob
-import requests
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
-import zipfile
-import io
-import re
-import time
 from pathlib import Path
-import urllib.parse
+import config
 import getpass
+import glob
+import io
+import language
+import os
+import re
+import requests
 import shutil
 import subprocess
-import language
-import config
-import os
+import time
+import urllib.parse
+import zipfile
 
 
 conf, secret_conf, skipped_questions = config.get_conf()
@@ -33,7 +33,6 @@ Commands:
 (>)/skip: skips current question
 (h)/help: shows this message
 (q)uit/exit: exits program
-
 """
 
 LANGUAGES = language.make_languages(conf)
