@@ -21,12 +21,23 @@ HOST = conf['config']["host"]
 SOLUTION_FILE = conf['config']['solution_file']
 CACHE_DIR = conf['config']['cache']
 
-LANGUAGES = language.make_languages(conf)
+HELP_MSG = f"""
+Commands:
+(n)ext: go to next question
+(p)revious: go to previous question
+(s)ubmit [solution_file]: submit solution. Default file: {SOLUTION_FILE}
+(r)un [solution_file]: runs solution file against sample. Default file: {SOLUTION_FILE}
+(t)est [solution_file]: runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}
+(>)/skip: skips current question
+(h)/help: shows this message
+(q)uit/exit: exits program
 
+"""
+
+LANGUAGES = language.make_languages(conf)
 
 class AuthError(Exception):
     pass
-
 
 def login(username: str, password: str):
     LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
@@ -285,5 +296,9 @@ if __name__ == '__main__':
             index = max(0, index - 1)
             prob = probs[index]
             show_prob(prob)
+        elif key.upper() == 'H':
+            print(HELP_MSG)
         else:
             print(f'"{key}" is not a valid command')
+            print(HELP_MSG)
+
