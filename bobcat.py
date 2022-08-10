@@ -63,6 +63,16 @@ class Problem:
     path: str
     difficulty: str
 
+@dataclass
+class Sample:
+    input_: str
+    output_: str
+
+@dataclass
+class ConcreteProblem(Problem):
+    description: str
+    samples: list[Sample]
+
 
 def get_probs(s) -> list[Problem]:
     PROBLEM_LIST_URL = urllib.parse.urljoin(
@@ -92,15 +102,20 @@ def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
         print("No samples")
 
 
-def get_prob(s: requests.Session, path: str) -> tuple[str, list]:
+def fetch_prob(s: requests.Session, path: str) -> tuple[str, list[Sample]]:
     r = s.get(f"https://open.kattis.com{path}")
     soup = BeautifulSoup(r.text, features='lxml')
 
     body = soup.find('div', {'class': 'problembody'})
+
     samples = [t.extract() for t in body.find_all(class_='sample')]
+    _ = [s.tr.extract() for s in samples]
+    samples = [Sample(input_= s.tr.td.extract().text.strip(), 
+        output_= s.tr.td.extract().text.strip()) for s in samples]
 
     for p in body.find_all('p'):
         p.replace_with(re.sub(r'\s+', ' ', p.text))
+
     return body.text.strip(), samples
 
 
@@ -215,19 +230,22 @@ def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
 
 
 if __name__ == '__main__':
-    def print_sample(sample, i: int):
-        sample.tr.extract()
+    def print_sample(sample: Sample, i: int):
         print(f"Input {i}")
-        print(sample.tr.td.extract().text.strip())
+        print(sample.input_)
         print()
         print(f"Output {i}")
-        print(sample.tr.td.extract().text.strip())
+        print(sample.output_)
         print()
 
-    def show_prob(prob):
+    def show_prob(prob: Problem | ConcreteProblem):
         os.system('clear')
-        desc, samples = get_prob(s, prob.path)
-        download_samples(s, prob.path)
+        if not isinstance(prob, ConcreteProblem):
+            download_samples(s, prob.path)
+            desc, samples = fetch_prob(s, prob.path)
+            probs[index] = ConcreteProblem(**prob.__dict__, description=desc,samples=samples)
+        else:
+            desc, samples = prob.description, prob.samples
 
         print(f"{prob.title} ({prob.difficulty})")
         print()
