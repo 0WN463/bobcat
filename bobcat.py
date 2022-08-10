@@ -26,7 +26,9 @@ LOCAL_TEST = conf['config'].getboolean('local_test')
 
 HELP_MSG = f"""
 Commands:
-(i)nfo: show description of current question
+(i)nfo: show information (description and samples) of current question
+(d)escription: show description of current question
+(e)xample: show samples of current question
 (n)ext: go to next question
 (p)revious: go to previous question
 (s)ubmit [solution_file]: submit solution. Default file: {SOLUTION_FILE}
@@ -230,6 +232,12 @@ def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
 
 
 if __name__ == '__main__':
+    def print_desc(prob: ConcreteProblem):
+        print(f"{prob.title} ({prob.difficulty})")
+        print()
+        print(prob.description)
+        print()
+
     def print_sample(sample: Sample, i: int):
         print(f"Input {i}")
         print(sample.input_)
@@ -242,16 +250,13 @@ if __name__ == '__main__':
         os.system('clear')
         if not isinstance(prob, ConcreteProblem):
             download_samples(s, prob.path)
-            desc, samples = fetch_prob(s, prob.path)
-            probs[index] = ConcreteProblem(**prob.__dict__, description=desc,samples=samples)
-        else:
-            desc, samples = prob.description, prob.samples
 
-        print(f"{prob.title} ({prob.difficulty})")
-        print()
-        print(desc)
-        print()
-        for i, sample in enumerate(samples, start=1):
+            desc, samples = fetch_prob(s, prob.path)
+            prob = ConcreteProblem(**prob.__dict__, description=desc,samples=samples)
+            probs[index] = prob
+        
+        print_desc(prob)
+        for i, sample in enumerate(prob.samples, start=1):
             print_sample(sample, i)
 
     has_cred = secret_conf.has_section(
@@ -276,6 +281,20 @@ if __name__ == '__main__':
         if key.upper() in ['Q', 'EXIT', 'QUIT']:
             config.save_skipped(skipped_questions)
             exit()
+        elif key.upper() in ['D']:
+            prob = probs[index]
+            os.system('clear')
+            print_desc(prob)
+        elif key.upper() in ['E']:
+            prob = probs[index]
+    
+            if not prob.samples:
+                print("No samples")
+                continue
+
+            os.system('clear')
+            for i, sample in enumerate(prob.samples):
+                print_sample(sample, i)
         elif key.upper() in ['I', 'INFO']:
             show_prob(prob)
         elif key.upper() in ['>', 'SKIP']:
