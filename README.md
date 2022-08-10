@@ -9,13 +9,13 @@ A CLI tool to interface with [Kattis](https://open.kattis.com/), the online judg
 * Run and test solution against samples
 * Multiple options to configure
 
-All in the command line, without having to traverse around Kattis' website.
+All in the command line, without having to nagivate Kattis' website.
 
 ## Installation
 
 ### From source
 
-``` bash
+``` sh
 git clone https://github.com/0WN463/bobcat
 cd bobcat
 pip install -r requirements.txt
