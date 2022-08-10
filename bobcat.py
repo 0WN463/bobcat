@@ -65,10 +65,12 @@ class Problem:
     path: str
     difficulty: str
 
+
 @dataclass
 class Sample:
     input_: str
     output_: str
+
 
 @dataclass
 class ConcreteProblem(Problem):
@@ -112,8 +114,8 @@ def fetch_prob(s: requests.Session, path: str) -> tuple[str, list[Sample]]:
 
     samples = [t.extract() for t in body.find_all(class_='sample')]
     _ = [s.tr.extract() for s in samples]
-    samples = [Sample(input_= s.tr.td.extract().text.strip(), 
-        output_= s.tr.td.extract().text.strip()) for s in samples]
+    samples = [Sample(input_=s.tr.td.extract().text.strip(),
+                      output_=s.tr.td.extract().text.strip()) for s in samples]
 
     for p in body.find_all('p'):
         p.replace_with(re.sub(r'\s+', ' ', p.text))
@@ -140,7 +142,7 @@ def submit(s: requests.Session, problem_path, source_file) -> int:
             "mainclass": "",
             "submit": True,
             }
-    print(data)
+
     r = s.post(f"https://open.kattis.com{problem_path}/submit", json=data)
 
     m = re.match(r'Submission received\. Submission ID: (\d+)\.', r.text)
@@ -161,7 +163,7 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
 
     for file in in_files:
         build_cmd = lang.build_cmd.format(
-            sol=solution_file, cache_dir=test_case_dir)
+            source_file=solution_file, cache_dir=test_case_dir)
         subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
 
         run_cmd = lang.run_cmd.format(
@@ -194,7 +196,7 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
         ans_file = file.replace("in", "ans")
 
         build_cmd = lang.build_cmd.format(
-            sol=solution_file, cache_dir=test_case_dir)
+            source_file=solution_file, cache_dir=test_case_dir)
         subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
 
         run_cmd = lang.run_cmd.format(
@@ -252,9 +254,10 @@ if __name__ == '__main__':
             download_samples(s, prob.path)
 
             desc, samples = fetch_prob(s, prob.path)
-            prob = ConcreteProblem(**prob.__dict__, description=desc,samples=samples)
+            prob = ConcreteProblem(
+                **prob.__dict__, description=desc, samples=samples)
             probs[index] = prob
-        
+
         print_desc(prob)
         for i, sample in enumerate(prob.samples, start=1):
             print_sample(sample, i)
@@ -277,7 +280,6 @@ if __name__ == '__main__':
     while True:
         key = input("Enter command: ")
 
-
         if key.upper() in ['Q', 'EXIT', 'QUIT']:
             config.save_skipped(skipped_questions)
             exit()
@@ -287,7 +289,7 @@ if __name__ == '__main__':
             print_desc(prob)
         elif key.upper() in ['E']:
             prob = probs[index]
-    
+
             if not prob.samples:
                 print("No samples")
                 continue
