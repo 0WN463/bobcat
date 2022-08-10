@@ -23,6 +23,8 @@ HOST = conf['config']["host"]
 SOLUTION_FILE = conf['config']['solution_file']
 CACHE_DIR = conf['config']['cache']
 LOCAL_TEST = conf['config'].getboolean('local_test')
+Q_FILTERS = conf['config']['filters'].strip().split(" ")
+Q_ORDER = conf['config']['sort_order'].strip()
 
 HELP_MSG = f"""
 Commands:
@@ -78,9 +80,13 @@ class ConcreteProblem(Problem):
     samples: list[Sample]
 
 
-def get_probs(s) -> list[Problem]:
+def get_probs(s, filters: list[str], ordering: str) -> list[Problem]:
+    filter_params = [f"show_{f}=off" for f in filters if f in ["tried", "untried", "solved"]]
+    order_params = [f'order={ordering.replace("+", "%2B")}']
+    query_param = "&".join([*order_params, *filter_params])
+
     PROBLEM_LIST_URL = urllib.parse.urljoin(
-        HOST, "/problems?order=%2Bdifficulty_category&show_solved=off&show_tried=on&show_untried=on")
+        HOST, f"/problems?{query_param}")
     res = s.get(PROBLEM_LIST_URL)
     soup = BeautifulSoup(res.text, features='lxml')
 
@@ -114,8 +120,13 @@ def fetch_prob(s: requests.Session, path: str) -> tuple[str, list[Sample]]:
 
     samples = [t.extract() for t in body.find_all(class_='sample')]
     _ = [s.tr.extract() for s in samples]
-    samples = [Sample(input_=s.tr.td.extract().text.strip(),
-                      output_=s.tr.td.extract().text.strip()) for s in samples]
+
+    # We will face error trying to extract samples of "interactive" problems
+    try:
+        samples = [Sample(input_=s.tr.td.extract().text.strip(),
+                          output_=s.tr.td.extract().text.strip()) for s in samples]
+    except Exception:
+        body.text.strip(), []
 
     for p in body.find_all('p'):
         p.replace_with(re.sub(r'\s+', ' ', p.text))
@@ -270,7 +281,7 @@ if __name__ == '__main__':
     Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
     s = login(user, password)
-    probs = get_probs(s)
+    probs = get_probs(s, Q_FILTERS, Q_ORDER)
 
     index = 0
     probs = [p for p in probs if p.path not in skipped_questions]
