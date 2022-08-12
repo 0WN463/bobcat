@@ -213,8 +213,8 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
     is_correct = True
     for file in in_files:
-        out_file = file.replace("in", "out")
-        ans_file = file.replace("in", "ans")
+        out_file = file.replace(".in", ".out")
+        ans_file = file.replace(".in", ".ans")
 
         build_cmd = lang.build_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
@@ -382,9 +382,9 @@ if __name__ == '__main__':
             except ProblemNotFound:
                 print(f"No problems found that has a ID of {m.group(2)}")
                 continue
-            download_samples(s, prob.path)
             prob = ConcreteProblem(
                 difficulty=difficulty, path=path, title=title, description=desc, samples=samples)
+            download_samples(s, prob.path)
 
             print_desc(prob)
             for i, sample in enumerate(prob.samples, start=1):
