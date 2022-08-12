@@ -1,7 +1,8 @@
 #!/usr/bin/python
 from bs4 import BeautifulSoup
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 import config
 import getpass
 import glob
@@ -26,20 +27,28 @@ LOCAL_TEST = conf['config'].getboolean('local_test')
 Q_FILTERS = conf['config']['filters'].strip().split(" ")
 Q_ORDER = conf['config']['sort_order'].strip()
 
-HELP_MSG = f"""
-Commands:
-(i)nfo: show information (description and samples) of current question
-(d)escription: show description of current question
-(e)xample: show samples of current question
-(n)ext: go to next question
-(p)revious: go to previous question
-(s)ubmit [solution_file]: submit solution. Default file: {SOLUTION_FILE}
-(r)un [solution_file]: runs solution file against sample. Default file: {SOLUTION_FILE}
-(t)est [solution_file]: runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}
-(>)/skip: skips current question
-(h)/help: shows this message
-(q)uit/exit: exits program
-"""
+
+@dataclass
+class Command:
+    label: str
+    description: str
+    keywords: list[str] = field(default_factory=list)
+    func: Callable[[str], None] = field(init=False)
+
+
+COMMANDS: list[Command] = []
+
+
+def register_command(cmd: Command):
+    def decorator_reg(func):
+        def inner(*args, **kwargs):
+            return func(*args, **kwargs)
+        cmd.func = func
+        return inner
+
+    COMMANDS.append(cmd)
+    return decorator_reg
+
 
 LANGUAGES = language.make_languages(conf)
 
@@ -295,104 +304,151 @@ if __name__ == '__main__':
 
     index = 0
     probs = [p for p in probs if p.path not in skipped_questions]
+    show_prob(probs[index])
     prob = probs[index]
-    show_prob(prob)
+
+    @register_command(Command("(n)ext", "go to next question", ['N']))
+    def cmd_next(*_: str):
+        global index, prob, probs
+        index += 1
+        show_prob(probs[index])
+        prob = probs[index]
+
+    @register_command(Command("(p)revious", "go to previous question", ["P"]))
+    def cmd_prev(*_: str):
+        global index, prob, probs
+        index = max(0, index - 1)
+        show_prob(probs[index])
+        prob = probs[index]
+
+    @register_command(Command("(>)/skip", "skips current question", [">", "SKIP"]))
+    def cmd_skip(*_: str):
+        global index, prob, probs
+        skipped_questions.append(prob.path)
+        probs = [p for p in probs if p.path not in skipped_questions]
+        show_prob(probs[index])
+        prob = probs[index]
+
+    @register_command(Command("(i)nfo", "show information (description and samples) of current question", ["I", "INFO"]))
+    def cmd_info(*_: str):
+        show_prob(prob)
+
+    @register_command(Command("(d)escription", "show description of current question", ["D"]))
+    def cmd_desc(*_: str):
+        os.system('clear')
+        print_desc(prob)
+
+    @register_command(Command("(e)xample", "show samples of current question", ["E"]))
+    def cmd_example(*_: str):
+        os.system('clear')
+
+        if not prob.samples:
+            print("No samples")
+            return
+
+        for i, sample in enumerate(prob.samples):
+            print_sample(sample, i)
+
+    @register_command(Command("(t)est [solution_file]", f"runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}", ["T"]))
+    def cmd_test(command: str):
+        if not (m := re.match(r'(t|T)(\s+(\S*))?', command)):
+            return
+
+        os.system('clear')
+        solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
+        print(f"Testing {solution_file}")
+
+        if local_test(solution_file):
+            print(f"Passed all test cases")
+
+    @register_command(Command("(r)un [solution_file]", f"runs solution file against sample. Default file: {SOLUTION_FILE}", ["R"]))
+    def cmd_run(command: str):
+        if not (m := re.match(r'(r|R)(\s+(\S*))?', command)):
+            return
+        os.system('clear')
+        solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
+        print(f"Running {solution_file}")
+        local_run(solution_file)
+
+    @register_command(Command("(s)ubmit [solution_file]", f"submit solution. Default file: {SOLUTION_FILE}", ["S"]))
+    def cmd_submit(command: str):
+        if not(m := re.match(r'(s|S)(\s+(\S*))?', command)):
+            return
+
+        os.system('clear')
+        solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
+        print(f"Submitting {solution_file}")
+
+        if LOCAL_TEST and not local_test(solution_file):
+            if input("Submit anyways? (y/N): ").upper() != 'Y':
+                return
+
+        submission_id = submit(s, prob.path, solution_file)
+        print(f"Submitted. ID: {submission_id}")
+
+        while result := get_result(s, submission_id):
+            status, test_cases = result
+            print(f"Running... ({test_cases})")
+            if status not in ['Running', 'New', 'Compiling']:
+                break
+
+            time.sleep(1)
+
+        print(result)
+
+    @register_command(Command("(o)pen PROBLEM_ID", "Loads the problem with the problem ID", ["O"]))
+    def cmd_open(command: str):
+        if not (m := re.match(r'(o|O)\s+(\S*)', command)):
+            return
+
+        os.system('clear')
+
+        if not m.group(2):
+            print("Problem ID required")
+            return
+
+        path = f"/problems/{m.group(2)}"
+
+        try:
+            desc, samples, difficulty, title = fetch_prob(
+                s, path, with_details=True)
+        except ProblemNotFound:
+            print(f"No problems found that has a ID of {m.group(2)}")
+            return
+
+        global prob
+        prob = ConcreteProblem(
+            difficulty=difficulty, path=path, title=title, description=desc, samples=samples)
+        download_samples(s, prob.path)
+
+        print_desc(prob)
+        for i, sample in enumerate(prob.samples, start=1):
+            print_sample(sample, i)
+
+    @register_command(Command("(h)elp", "displays help", ["H", "?"]))
+    def cmd_help(*_: str, clear=True):
+        if clear:
+            os.system('clear')
+        msg = "\n".join(f"{c.label}: {c.description}" for c in COMMANDS)
+        print("Commands:")
+        print(msg)
+        print()
+
+    @register_command(Command("(q)uit", "exits the program", ['Q', 'EXIT', 'QUIT']))
+    def cmd_quit(*_: str):
+        config.save_skipped(skipped_questions)
+        exit()
 
     while True:
         key = input("Enter command: ")
+        keyword = key.split(" ")[0].upper()
 
-        if key.upper() in ['Q', 'EXIT', 'QUIT']:
-            config.save_skipped(skipped_questions)
-            exit()
-        elif key.upper() in ['D']:
-            prob = probs[index]
-            os.system('clear')
-            print_desc(prob)
-        elif key.upper() in ['E']:
-            prob = probs[index]
-
-            if not prob.samples:
-                print("No samples")
-                continue
-
-            os.system('clear')
-            for i, sample in enumerate(prob.samples):
-                print_sample(sample, i)
-        elif key.upper() in ['I', 'INFO']:
-            show_prob(prob)
-        elif key.upper() in ['>', 'SKIP']:
-            skipped_questions.append(prob.path)
-            probs = [p for p in probs if p.path not in skipped_questions]
-            prob = probs[index]
-            show_prob(prob)
-        elif m := re.match(r'(t|T)(\s+(\S*))?', key):
-            os.system('clear')
-            solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
-            print(f"Testing {solution_file}")
-
-            if local_test(solution_file):
-                print(f"Passed all test cases")
-        elif m := re.match(r'(r|R)(\s+(\S*))?', key):
-            os.system('clear')
-            solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
-            print(f"Running {solution_file}")
-            local_run(solution_file)
-
-        elif m := re.match(r'(s|S)(\s+(\S*))?', key):
-            os.system('clear')
-            solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
-            print(f"Submitting {solution_file}")
-
-            if LOCAL_TEST and not local_test(solution_file):
-                if input("Submit anyways? (y/N): ").upper() != 'Y':
-                    continue
-
-            submission_id = submit(s, prob.path, solution_file)
-            print(f"Submitted. ID: {submission_id}")
-
-            while result := get_result(s, submission_id):
-                status, test_cases = result
-                print(f"Running... ({test_cases})")
-                if status not in ['Running', 'New', 'Compiling']:
-                    break
-
-                time.sleep(1)
-
-            print(result)
-        elif key.upper() == 'N':
-            index += 1
-            prob = probs[index]
-            show_prob(prob)
-        elif key.upper() == 'P':
-            index = max(0, index - 1)
-            prob = probs[index]
-            show_prob(prob)
-        elif m := re.match(r'(j|J)\s+(\S*)', key):
-            os.system('clear')
-
-            if not m.group(2):
-                print("Problem ID required")
-                continue
-
-            path = f"/problems/{m.group(2)}"
-
-            try:
-                desc, samples, difficulty, title = fetch_prob(
-                    s, path, with_details=True)
-            except ProblemNotFound:
-                print(f"No problems found that has a ID of {m.group(2)}")
-                continue
-            prob = ConcreteProblem(
-                difficulty=difficulty, path=path, title=title, description=desc, samples=samples)
-            download_samples(s, prob.path)
-
-            print_desc(prob)
-            for i, sample in enumerate(prob.samples, start=1):
-                print_sample(sample, i)
-        elif key.upper() == 'H':
-            os.system('clear')
-            print(HELP_MSG)
+        for cmd in COMMANDS:
+            if keyword in cmd.keywords:
+                cmd.func(key)
+                break
         else:
             os.system('clear')
-            print(f'"{key}" is not a valid command')
-            print(HELP_MSG)
+            print(f'"{key}" is not a valid command\n')
+            cmd_help(clear=False)
+            continue
