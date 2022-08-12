@@ -48,6 +48,10 @@ class AuthError(Exception):
     pass
 
 
+class ProblemNotFound(Exception):
+    pass
+
+
 def login(username: str, password: str):
     LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
     s = requests.Session()
@@ -81,7 +85,8 @@ class ConcreteProblem(Problem):
 
 
 def get_probs(s, filters: list[str], ordering: str) -> list[Problem]:
-    filter_params = [f"show_{f}=off" for f in filters if f in ["tried", "untried", "solved"]]
+    filter_params = [f"show_{f}=off" for f in filters if f in [
+        "tried", "untried", "solved"]]
     order_params = [f'order={ordering.replace("+", "%2B")}']
     query_param = "&".join([*order_params, *filter_params])
 
@@ -112,9 +117,11 @@ def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
         print("No samples")
 
 
-def fetch_prob(s: requests.Session, path: str) -> tuple[str, list[Sample]]:
+def fetch_prob(s: requests.Session, path: str, with_details: bool = False) -> tuple[str, list[Sample]] | tuple[str, list[Sample], str, str]:
     r = s.get(f"https://open.kattis.com{path}")
     soup = BeautifulSoup(r.text, features='lxml')
+    if '404' in soup.find('title').text:
+        raise ProblemNotFound("Problem not found")
 
     body = soup.find('div', {'class': 'problembody'})
 
@@ -130,6 +137,9 @@ def fetch_prob(s: requests.Session, path: str) -> tuple[str, list[Sample]]:
 
     for p in body.find_all('p'):
         p.replace_with(re.sub(r'\s+', ' ', p.text))
+
+    if with_details:
+        return body.text.strip(), samples, soup.find('span', {'class': 'difficulty_number'}).text.strip(), soup.find('h1', {'class': 'book-page-heading'}).text.strip(),
 
     return body.text.strip(), samples
 
@@ -357,6 +367,28 @@ if __name__ == '__main__':
             index = max(0, index - 1)
             prob = probs[index]
             show_prob(prob)
+        elif m := re.match(r'(j|J)\s+(\S*)', key):
+            os.system('clear')
+
+            if not m.group(2):
+                print("Problem ID required")
+                continue
+
+            path = f"/problems/{m.group(2)}"
+
+            try:
+                desc, samples, difficulty, title = fetch_prob(
+                    s, path, with_details=True)
+            except ProblemNotFound:
+                print(f"No problems found that has a ID of {m.group(2)}")
+                continue
+            download_samples(s, prob.path)
+            prob = ConcreteProblem(
+                difficulty=difficulty, path=path, title=title, description=desc, samples=samples)
+
+            print_desc(prob)
+            for i, sample in enumerate(prob.samples, start=1):
+                print_sample(sample, i)
         elif key.upper() == 'H':
             os.system('clear')
             print(HELP_MSG)
