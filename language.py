@@ -44,6 +44,12 @@ def make_languages(config: configparser.ConfigParser) -> Languages:
             ".cpp",
             LANGUAGE_CONF['c++']['build'],
             LANGUAGE_CONF['c++']['exec'],
+        ),
+        Language(
+            "Rust",
+            ".rs",
+            LANGUAGE_CONF['rust']['build'],
+            LANGUAGE_CONF['rust']['exec'],
         )
     ]
 
