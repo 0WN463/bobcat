@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 from bs4 import BeautifulSoup
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -194,8 +194,13 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
         run_cmd = f'{run_cmd} < {file}'
-        out = subprocess.Popen(
-            run_cmd, shell=True, stdout=subprocess.PIPE).stdout.read().decode('ascii')
+        p = subprocess.Popen(
+            run_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ret_code = p.wait()
+        out = p.stdout.read().decode('ascii')
+        err = p.stderr.read().decode('ascii')
+
+        print(ret_code)
 
         print(f"Input: ")
 
@@ -204,7 +209,13 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
 
         print("Output: ")
         print(out)
+
+        if ret_code or err:
+            print(f"Program terminated with exit code {ret_code}")
+            print(err)
+
         print()
+
 
 
 def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
@@ -224,7 +235,22 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
         diff_cmd = f'{run_cmd} < {file} > {out_file}'
-        subprocess.Popen(diff_cmd, shell=True, stdout=subprocess.PIPE).wait()
+        p = subprocess.Popen(diff_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        ret_code = p.wait()
+        err = p.stderr.read().decode('ascii')
+
+        if err or ret_code:
+            print(f"Input: ")
+
+            with open(file, 'r') as f:
+                print(f.read())
+
+            print(f"Program terminated with exit code of {ret_code}")
+            print(err)
+            print()
+            is_correct = False
+            continue
 
         diff = subprocess.Popen(f'diff --unified {ans_file} {out_file}',
                                 shell=True, stdout=subprocess.PIPE).stdout.read().decode('ascii')
@@ -377,10 +403,10 @@ if __name__ == '__main__':
 
         os.system('clear')
         solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
-        print(f"Submitting {solution_file}")
 
         try:
             if LOCAL_TEST and not local_test(solution_file):
+                print("Local test failed")
                 if input("Submit anyways? (y/N): ").upper() != 'Y':
                     return
 
