@@ -11,14 +11,19 @@ class Language:
     build_cmd: str
     run_cmd: str
 
+class ExtensionNotSupported(Exception):
+    pass
 
 @dataclass
 class Languages:
     languages: list[Language]
 
-    def get_lang(self, file: str) -> Language | None:
+    def get_lang(self, file: str) -> Language:
         ext = Path(file).suffix
         lang = next((lang for lang in self.languages if lang.ext == ext), None)
+
+        if not lang:
+            raise ExtensionNotSupported(f"'{ext}' is not supported.")
         return lang
 
 

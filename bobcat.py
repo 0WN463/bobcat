@@ -61,6 +61,7 @@ class ProblemNotFound(Exception):
     pass
 
 
+
 def login(username: str, password: str):
     LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
     s = requests.Session()
@@ -158,16 +159,13 @@ def submit(s: requests.Session, problem_path, source_file) -> int:
         source = f.read()
 
     file_name = Path(source_file).name
-    language = LANGUAGES.get_lang(source_file)
-
-    if not language:
-        raise ValueError(f"File extension not supported: {file_name}")
+    lang = LANGUAGES.get_lang(source_file)
 
     prob = problem_path.replace('/problems/', '')
     code_file = {"code": source, "filename": file_name,
                  "id": 0, "session": None}
     data = {"files": [code_file],
-            "language": language.name,
+            "language": lang.name,
             "problem": prob,
             "mainclass": "",
             "submit": True,
@@ -185,9 +183,6 @@ def submit(s: requests.Session, problem_path, source_file) -> int:
 
 def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
     lang = LANGUAGES.get_lang(solution_file)
-
-    if not lang:
-        raise ValueError("Unsupported language")
 
     in_files = sorted(glob.glob(f'{test_case_dir}/*.in'))
 
@@ -214,9 +209,6 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
 
 def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     lang = LANGUAGES.get_lang(solution_file)
-
-    if not lang:
-        raise ValueError("Unsupported language")
 
     in_files = sorted(glob.glob(f'{test_case_dir}/*.in'))
 
@@ -357,9 +349,13 @@ if __name__ == '__main__':
         os.system('clear')
         solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
         print(f"Testing {solution_file}")
+    
+        try:
+            if local_test(solution_file):
+                print(f"Passed all test cases")
+        except language.ExtensionNotSupported as e:
+            print(e)
 
-        if local_test(solution_file):
-            print(f"Passed all test cases")
 
     @register_command(Command("(r)un [solution_file]", f"runs solution file against sample. Default file: {SOLUTION_FILE}", ["R"]))
     def cmd_run(command: str):
@@ -368,7 +364,11 @@ if __name__ == '__main__':
         os.system('clear')
         solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
         print(f"Running {solution_file}")
-        local_run(solution_file)
+
+        try:
+            local_run(solution_file)
+        except language.ExtensionNotSupported as e:
+            print(e)
 
     @register_command(Command("(s)ubmit [solution_file]", f"submit solution. Default file: {SOLUTION_FILE}", ["S"]))
     def cmd_submit(command: str):
@@ -379,22 +379,25 @@ if __name__ == '__main__':
         solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
         print(f"Submitting {solution_file}")
 
-        if LOCAL_TEST and not local_test(solution_file):
-            if input("Submit anyways? (y/N): ").upper() != 'Y':
-                return
+        try:
+            if LOCAL_TEST and not local_test(solution_file):
+                if input("Submit anyways? (y/N): ").upper() != 'Y':
+                    return
 
-        submission_id = submit(s, prob.path, solution_file)
-        print(f"Submitted. ID: {submission_id}")
+            submission_id = submit(s, prob.path, solution_file)
+            print(f"Submitted. ID: {submission_id}")
 
-        while result := get_result(s, submission_id):
-            status, test_cases = result
-            print(f"Running... ({test_cases})")
-            if status not in ['Running', 'New', 'Compiling']:
-                break
+            while result := get_result(s, submission_id):
+                status, test_cases = result
+                print(f"Running... ({test_cases})")
+                if status not in ['Running', 'New', 'Compiling']:
+                    break
 
-            time.sleep(1)
+                time.sleep(1)
 
-        print(result)
+            print(result)
+        except language.ExtensionNotSupported as e:
+            print(e)
 
     @register_command(Command("(o)pen PROBLEM_ID", "Loads the problem with the problem ID", ["O"]))
     def cmd_open(command: str):
