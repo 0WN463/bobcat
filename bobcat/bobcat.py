@@ -327,21 +327,21 @@ def main():
 
     @register_command(Command("(n)ext", "go to next question", ['N']))
     def cmd_next(*_: str):
-        global index, prob, probs
+        nonlocal index, prob, probs
         index += 1
         show_prob(probs[index])
         prob = probs[index]
 
     @register_command(Command("(p)revious", "go to previous question", ["P"]))
     def cmd_prev(*_: str):
-        global index, prob, probs
+        nonlocal index, prob, probs
         index = max(0, index - 1)
         show_prob(probs[index])
         prob = probs[index]
 
     @register_command(Command("(>)/skip", "skips current question", [">", "SKIP"]))
     def cmd_skip(*_: str):
-        global index, prob, probs
+        nonlocal index, prob, probs
         skipped_questions.append(prob.path)
         probs = [p for p in probs if p.path not in skipped_questions]
         show_prob(probs[index])
@@ -445,7 +445,7 @@ def main():
             print(f"No problems found that has a ID of {m.group(2)}")
             return
 
-        global prob
+        nonlocal prob
         prob = ConcreteProblem(
             difficulty=difficulty, path=path, title=title, description=desc, samples=samples)
         download_samples(s, prob.path)
