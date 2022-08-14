@@ -3,11 +3,11 @@ from bs4 import BeautifulSoup
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
-import config
+from . import config
 import getpass
 import glob
 import io
-import language
+from . import language
 import os
 import re
 import requests
@@ -281,7 +281,7 @@ def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
     return result, test_cases
 
 
-if __name__ == '__main__':
+def main():
     def print_desc(prob: ConcreteProblem):
         print(f"{prob.title} ({prob.difficulty})")
         print()
@@ -481,3 +481,6 @@ if __name__ == '__main__':
             print(f'"{key}" is not a valid command\n')
             cmd_help(clear=False)
             continue
+
+if __name__ == '__main__':
+    main()
