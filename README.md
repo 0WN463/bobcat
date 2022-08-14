@@ -29,7 +29,7 @@ Then add `bobcat.py` to your `PATH`.
 
 Config will be retrieved in order from `$XDG_CONFIG_HOME/bobcat/config.ini`, `$HOME/.bobcat.ini` and `$BINARY_PATH/config.ini` (default config).
 
-An example of the config file can be referenced from the [default config](https://github.com/0WN463/bobcat/blob/main/config.ini).
+An example of the config file can be referenced from the [default config](https://github.com/0WN463/bobcat/blob/main/bobcat/config.ini).
 
 ### Login credentials
 
