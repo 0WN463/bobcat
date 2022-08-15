@@ -31,31 +31,9 @@ def make_languages(config: configparser.ConfigParser) -> Languages:
     LANGUAGE_CONF = config["languages"]
     LANGUAGE_CONF = {k: literal_eval(v) for k, v in LANGUAGE_CONF.items()}
 
-    languages = [
-        Language(
-            "Python 3",
-            ".py",
-            LANGUAGE_CONF['python']['build'],
-            LANGUAGE_CONF['python']['exec'],
-        ),
-        Language(
-            "Haskell",
-            ".hs",
-            LANGUAGE_CONF['haskell']['build'],
-            LANGUAGE_CONF['haskell']['exec'],
-        ),
-        Language(
-            "C++",
-            ".cpp",
-            LANGUAGE_CONF['c++']['build'],
-            LANGUAGE_CONF['c++']['exec'],
-        ),
-        Language(
-            "Rust",
-            ".rs",
-            LANGUAGE_CONF['rust']['build'],
-            LANGUAGE_CONF['rust']['exec'],
-        )
-    ]
+    languages = [Language(lang, 
+        LANGUAGE_CONF[lang]['ext'],
+        LANGUAGE_CONF[lang]['build'],
+        LANGUAGE_CONF[lang]['exec']) for lang in LANGUAGE_CONF]
 
     return Languages(languages)

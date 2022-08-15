@@ -19,6 +19,7 @@ SKIP_FILE = os.path.join(SKIP_DIR, 'skipped')
 
 def get_conf() -> tuple[ConfigParser, ConfigParser, list[str]]:
     config = ConfigParser()
+    config.optionxform = str
     script_path = os.path.realpath(__file__)
     DEFAULT_CONFIG_FILE = os.path.join(
         os.path.dirname(script_path), 'config.ini')
