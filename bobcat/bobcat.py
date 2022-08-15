@@ -200,8 +200,6 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
         out = p.stdout.read().decode('ascii')
         err = p.stderr.read().decode('ascii')
 
-        print(ret_code)
-
         print(f"Input: ")
 
         with open(file, 'r') as f:
