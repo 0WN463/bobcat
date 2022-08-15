@@ -155,7 +155,7 @@ def fetch_prob(s: requests.Session, path: str, with_details: bool = False) -> tu
 
 
 def submit(s: requests.Session, problem_path, source_file) -> int:
-    with open(source_file, 'r') as f:
+    with open(os.path.expanduser(source_file), 'r') as f:
         source = f.read()
 
     file_name = Path(source_file).name
