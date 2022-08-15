@@ -283,6 +283,7 @@ def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
 
 def main():
     def print_desc(prob: ConcreteProblem):
+        print(f"{prob.path}")
         print(f"{prob.title} ({prob.difficulty})")
         print()
         print(prob.description)
