@@ -337,6 +337,8 @@ def main():
         index = max(0, index - 1)
         show_prob(probs[index])
         prob = probs[index]
+        # Need to repopulate samples of previous problem
+        download_samples(s, prob.path)
 
     @register_command(Command("(>)/skip", "skips current question", [">", "SKIP"]))
     def cmd_skip(*_: str):
