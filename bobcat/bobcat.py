@@ -14,6 +14,7 @@ import requests
 import shutil
 import subprocess
 import time
+import unicodedata
 import urllib.parse
 import zipfile
 
@@ -59,7 +60,6 @@ class AuthError(Exception):
 
 class ProblemNotFound(Exception):
     pass
-
 
 
 def login(username: str, password: str):
@@ -215,7 +215,6 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
         print()
 
 
-
 def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     lang = LANGUAGES.get_lang(solution_file)
 
@@ -233,7 +232,8 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
         diff_cmd = f'{run_cmd} < {file} > {out_file}'
-        p = subprocess.Popen(diff_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(diff_cmd, shell=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         ret_code = p.wait()
         err = p.stderr.read().decode('ascii')
@@ -270,13 +270,15 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     return is_correct
 
 
-def get_result(s: requests.Session, submission_id: int) -> tuple[str, str]:
+def get_result(s: requests.Session, submission_id: int) -> tuple[str, str, str]:
     r = s.get(f'https://open.kattis.com/submissions/{submission_id}')
     soup = BeautifulSoup(r.text, features='lxml')
     result = soup.find('div', class_='status').text
+    time_taken = soup.find('td', {'data-type': 'cpu'}).text
+    time_taken = unicodedata.normalize("NFKD", time_taken)
     test_cases = soup.find(
         'div', class_='horizontal_item').find_all(text=True)[0]
-    return result, test_cases
+    return result, test_cases, time_taken
 
 
 def main():
@@ -376,13 +378,12 @@ def main():
         os.system('clear')
         solution_file = m.group(3) if m.group(3) else SOLUTION_FILE
         print(f"Testing {solution_file}")
-    
+
         try:
             if local_test(solution_file):
                 print(f"Passed all test cases")
         except language.ExtensionNotSupported as e:
             print(e)
-
 
     @register_command(Command("(r)un [solution_file]", f"runs solution file against sample. Default file: {SOLUTION_FILE}", ["R"]))
     def cmd_run(command: str):
@@ -415,7 +416,7 @@ def main():
             print(f"Submitted. ID: {submission_id}")
 
             while result := get_result(s, submission_id):
-                status, test_cases = result
+                status, test_cases, _ = result
                 print(f"Running... ({test_cases})")
                 if status not in ['Running', 'New', 'Compiling']:
                     break
