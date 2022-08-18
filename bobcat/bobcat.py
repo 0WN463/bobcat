@@ -22,6 +22,7 @@ import zipfile
 conf, secret_conf, skipped_questions = config.get_conf()
 
 HOST = conf['config']["host"]
+TIMEOUT = conf['config'].getint("timeout")
 SOLUTION_FILE = conf['config']['solution_file']
 CACHE_DIR = conf['config']['cache']
 LOCAL_TEST = conf['config'].getboolean('local_test')
@@ -193,7 +194,7 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
 
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
-        run_cmd = f'{run_cmd} < {file}'
+        run_cmd = f'timeout {TIMEOUT} {run_cmd} < {file}'
         p = subprocess.Popen(
             run_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         ret_code = p.wait()
@@ -208,7 +209,9 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
         print("Output: ")
         print(out)
 
-        if ret_code or err:
+        if ret_code == 124:
+            print("Program timed out")
+        elif ret_code or err:
             print(f"Program terminated with exit code {ret_code}")
             print(err)
 
@@ -231,7 +234,7 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
-        diff_cmd = f'{run_cmd} < {file} > {out_file}'
+        diff_cmd = f'timeout {TIMEOUT} {run_cmd} < {file} > {out_file}'
         p = subprocess.Popen(diff_cmd, shell=True,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -244,8 +247,11 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
             with open(file, 'r') as f:
                 print(f.read())
 
-            print(f"Program terminated with exit code of {ret_code}")
-            print(err)
+            if ret_code == 124:
+                print("Program timed out")
+            else:
+                print(f"Program terminated with exit code of {ret_code}")
+                print(err)
             print()
             is_correct = False
             continue
