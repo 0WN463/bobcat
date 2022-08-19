@@ -104,13 +104,15 @@ def get_probs(s, filters: list[str], ordering: str) -> list[Problem]:
     PROBLEM_LIST_URL = urllib.parse.urljoin(
         HOST, f"/problems?{query_param}")
     res = s.get(PROBLEM_LIST_URL)
+
     soup = BeautifulSoup(res.text, features='lxml')
 
     trs = [tr for tr in soup.table.tbody.find_all('tr')]
 
+
     return [Problem(title=tr.td.text,
                     path=tr.td.a['href'],
-                    difficulty=tr.findAll('td')[6].span.text)
+                    difficulty=tr.find('span', class_='difficulty_number').text)
             for tr in trs]
 
 
