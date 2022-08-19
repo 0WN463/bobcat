@@ -192,7 +192,11 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
     for file in in_files:
         build_cmd = lang.build_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
-        subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+        build_code = subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+
+        if build_code > 0:
+            print("Build failed")
+            break
 
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
@@ -200,8 +204,8 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
         p = subprocess.Popen(
             run_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         ret_code = p.wait()
-        out = p.stdout.read().decode('ascii')
-        err = p.stderr.read().decode('ascii')
+        out = p.stdout.read().decode('utf8')
+        err = p.stderr.read().decode('utf8')
 
         print(f"Input: ")
 
@@ -232,7 +236,11 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
         build_cmd = lang.build_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
-        subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+        build_code = subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+
+        if build_code > 0:
+            print("Build failed")
+            return False
 
         run_cmd = lang.run_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
@@ -425,7 +433,7 @@ def main():
 
             while result := get_result(s, submission_id):
                 status, test_cases, _ = result
-                print(f"Running... ({test_cases})")
+                print(f"{status}: ({test_cases})")
                 if status not in ['Running', 'New', 'Compiling']:
                     break
 
