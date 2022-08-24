@@ -386,7 +386,7 @@ def main():
         for i, sample in enumerate(prob.samples):
             print_sample(sample, i)
 
-    @register_command(Command("(t)est [solution_file]", f"runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}", ["T"]))
+    @register_command(Command("(t)est [SOLUTION_FILE]", f"runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}", ["T"]))
     def cmd_test(command: str):
         if not (m := re.match(r'(t|T)(\s+(\S*))?', command)):
             return
@@ -401,7 +401,7 @@ def main():
         except language.ExtensionNotSupported as e:
             print(e)
 
-    @register_command(Command("(r)un [solution_file]", f"runs solution file against sample. Default file: {SOLUTION_FILE}", ["R"]))
+    @register_command(Command("(r)un [SOLUTION_FILE]", f"runs solution file against sample. Default file: {SOLUTION_FILE}", ["R"]))
     def cmd_run(command: str):
         if not (m := re.match(r'(r|R)(\s+(\S*))?', command)):
             return
@@ -414,7 +414,7 @@ def main():
         except language.ExtensionNotSupported as e:
             print(e)
 
-    @register_command(Command("(s)ubmit [solution_file]", f"submit solution. Default file: {SOLUTION_FILE}", ["S"]))
+    @register_command(Command("(s)ubmit [SOLUTION_FILE]", f"submit solution. Default file: {SOLUTION_FILE}", ["S"]))
     def cmd_submit(command: str):
         if not(m := re.match(r'(s|S)(\s+(\S*))?', command)):
             return
