@@ -472,6 +472,25 @@ def main():
         for i, sample in enumerate(prob.samples, start=1):
             print_sample(sample, i)
 
+    @register_command(Command("(c)hoose SOLUTION_FILE", "sets default solution file to use when running/submitting", ['C']))
+    def cmd_choose(command: str):
+        if not(m := re.match(r'(c|C)\s+(\S+)', command)):
+            print("Please supply a path to the target solution file")
+            return
+
+        if not m.group(2):
+            print("Please supply a path to the target solution file")
+            return
+
+        os.system('clear')
+
+        global SOLUTION_FILE
+        SOLUTION_FILE = m.group(2)
+
+    def cmd_target(*_: str):
+        config.save_skipped(skipped_questions)
+        exit()
+
     @register_command(Command("(h)elp", "displays help", ["H", "?"]))
     def cmd_help(*_: str, clear=True):
         if clear:
