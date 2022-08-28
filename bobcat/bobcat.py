@@ -443,7 +443,7 @@ def main():
         except language.ExtensionNotSupported as e:
             print(e)
 
-    @register_command(Command("(o)pen PROBLEM_ID", "Loads the problem with the problem ID", ["O"]))
+    @register_command(Command("(o)pen PROBLEM_ID", "loads the problem with the problem ID", ["O"]))
     def cmd_open(command: str):
         if not (m := re.match(r'(o|O)\s+(\S*)', command)):
             return
