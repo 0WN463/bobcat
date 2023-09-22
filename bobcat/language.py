@@ -33,9 +33,11 @@ def make_languages(config: configparser.ConfigParser) -> Languages:
     LANGUAGE_CONF = config["languages"]
     LANGUAGE_CONF = {k: literal_eval(v) for k, v in LANGUAGE_CONF.items()}
 
-    languages = [Language(lang,
-                          LANGUAGE_CONF[lang]['ext'],
-                          LANGUAGE_CONF[lang]['build'],
-                          LANGUAGE_CONF[lang]['exec']) for lang in LANGUAGE_CONF]
+    languages = [
+        Language(
+            lang,
+            LANGUAGE_CONF[lang]['ext'],
+            LANGUAGE_CONF[lang]['build'],
+            LANGUAGE_CONF[lang]['exec']) for lang in LANGUAGE_CONF]
 
     return Languages(languages)

@@ -1,16 +1,9 @@
 #!/usr/bin/env python
-from bs4 import BeautifulSoup
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Callable
-from . import config
 import getpass
 import glob
 import io
-from . import language
 import os
 import re
-import requests
 import shutil
 import subprocess
 import time
@@ -18,6 +11,15 @@ import unicodedata
 import urllib.parse
 import zipfile
 
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable, Final
+import requests
+
+from bs4 import BeautifulSoup
+
+from . import config
+from . import language
 
 conf, secret_conf, skipped_questions = config.get_conf()
 
@@ -94,49 +96,63 @@ class ConcreteProblem(Problem):
     description: str
     samples: list[Sample]
 
+
 FILTERS = {
-        "untried": "f_untried", 
-        "partial": "f_partial-score", 
-        "tried": "f_tried", 
-        "solved": "f_solved"
+    "untried": "f_untried",
+    "partial": "f_partial-score",
+    "tried": "f_tried",
+    "solved": "f_solved"
 }
 ORDERS = {
-        "difficulty_category": "difficulty_data",
-        "subrat": 'submission_ratio', 
-        "name": 'title_link',
-        "fastest": 'fastest_solution', 
-        "subtot": 'submissions', 
-        "subacc": 'accepted_submissions', 
+    "difficulty_category": "difficulty_data",
+    "subrat": 'submission_ratio',
+    "name": 'title_link',
+    "fastest": 'fastest_solution',
+    "subtot": 'submissions',
+    "subacc": 'accepted_submissions',
 }
 
-def get_probs(s, filters: list[str], ordering: str, page: int) -> list[Problem]:
-    filter_params = [f"{q}={'off' if f in filters else 'on'}" for f, q in FILTERS.items()]
+
+def get_probs(
+        s,
+        filters: list[str],
+        ordering: str,
+        page: int) -> list[Problem]:
+    filter_params = [
+        f"{q}={'off' if f in filters else 'on'}" for f,
+        q in FILTERS.items()]
     ordering = ORDERS[re.sub(r'^[-+]', '', ordering)]
-    order_params = [f'order={"-" if ordering.startswith("-") else ""}{ordering}']
+    order_params = [
+        f'order={"-" if ordering.startswith("-") else ""}{ordering}']
     page_params = [f'page={page + 1}']
     query_param = "&".join([*order_params, *filter_params, *page_params])
 
-    PROBLEM_LIST_URL = urllib.parse.urljoin(
+    url: Final = urllib.parse.urljoin(
         HOST, f"/problems?{query_param}")
-    res = s.get(PROBLEM_LIST_URL)
-    
+    res = s.get(url)
+
     soup = BeautifulSoup(res.text, features='lxml')
 
-    trs = [tr for tr in soup.table.tbody.find_all('tr')]
+    trs = list(soup.table.tbody.find_all('tr'))
+
+    return [
+        Problem(
+            title=tr.td.text,
+            path=tr.td.a['href'],
+            difficulty=tr.find(
+                'span',
+                class_='difficulty_number').text) for tr in trs]
 
 
-    return [Problem(title=tr.td.text,
-                    path=tr.td.a['href'],
-                    difficulty=tr.find('span', class_='difficulty_number').text)
-            for tr in trs]
-
-
-def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
+def download_samples(
+        s: requests.Session,
+        path: str,
+        save_to=CACHE_DIR) -> None:
     shutil.rmtree(save_to)
     Path(save_to).mkdir(parents=True, exist_ok=True)
-    SAMPLE_URL = urllib.parse.urljoin(
+    sample_url: Final= urllib.parse.urljoin(
         HOST, f"{path}/file/statement/samples.zip")
-    r = s.get(SAMPLE_URL, stream=True)
+    r = s.get(sample_url, stream=True)
 
     try:
         with zipfile.ZipFile(io.BytesIO(r.content)) as z:
@@ -145,7 +161,13 @@ def download_samples(s: requests.Session, path: str, save_to=CACHE_DIR) -> None:
         print("No samples")
 
 
-def fetch_prob(s: requests.Session, path: str, with_details: bool = False) -> tuple[str, list[Sample]] | tuple[str, list[Sample], str, str]:
+def fetch_prob(s: requests.Session,
+               path: str,
+               with_details: bool = False) -> tuple[str,
+                                                    list[Sample]] | tuple[str,
+                                                                          list[Sample],
+                                                                          str,
+                                                                          str]:
     r = s.get(f"https://open.kattis.com{path}")
     soup = BeautifulSoup(r.text, features='lxml')
     if '404' in soup.find('title').text:
@@ -167,7 +189,11 @@ def fetch_prob(s: requests.Session, path: str, with_details: bool = False) -> tu
         p.replace_with(re.sub(r'\s+', ' ', p.text))
 
     if with_details:
-        return body.text.strip(), samples, soup.find('span', {'class': 'difficulty_number'}).text.strip(), soup.find('h1', {'class': 'book-page-heading'}).text.strip(),
+        return body.text.strip(), samples, soup.find(
+            'span', {
+                'class': 'difficulty_number'}).text.strip(), soup.find(
+            'h1', {
+                'class': 'book-page-heading'}).text.strip()
 
     return body.text.strip(), samples
 
@@ -207,7 +233,8 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
     for file in in_files:
         build_cmd = lang.build_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
-        build_code = subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+        build_code = subprocess.Popen(
+            build_cmd, shell=True, stdout=subprocess.PIPE).wait()
 
         if build_code > 0:
             print("Build failed")
@@ -217,14 +244,17 @@ def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
             source_file=solution_file, cache_dir=test_case_dir)
         run_cmd = f'timeout {TIMEOUT} {run_cmd} < {file}'
         p = subprocess.Popen(
-            run_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            run_cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
         ret_code = p.wait()
         out = p.stdout.read().decode('utf8')
         err = p.stderr.read().decode('utf8')
 
-        print(f"Input: ")
+        print("Input: ")
 
-        with open(file, 'r') as f:
+        with open(file, 'r', encoding='utf-8') as f:
             print(f.read())
 
         print("Output: ")
@@ -251,7 +281,8 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
 
         build_cmd = lang.build_cmd.format(
             source_file=solution_file, cache_dir=test_case_dir)
-        build_code = subprocess.Popen(build_cmd, shell=True, stdout=subprocess.PIPE).wait()
+        build_code = subprocess.Popen(
+            build_cmd, shell=True, stdout=subprocess.PIPE).wait()
 
         if build_code > 0:
             print("Build failed")
@@ -267,9 +298,9 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
         err = p.stderr.read().decode('ascii')
 
         if err or ret_code:
-            print(f"Input: ")
+            print("Input: ")
 
-            with open(file, 'r') as f:
+            with open(file, 'r', encoding="utf-8") as f:
                 print(f.read())
 
             if ret_code == 124:
@@ -281,8 +312,10 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
             is_correct = False
             continue
 
-        diff = subprocess.Popen(f'diff --unified {ans_file} {out_file}',
-                                shell=True, stdout=subprocess.PIPE).stdout.read().decode('ascii')
+        diff = subprocess.Popen(
+            f'diff --unified {ans_file} {out_file}',
+            shell=True,
+            stdout=subprocess.PIPE).stdout.read().decode('ascii')
 
         if diff:
             print(f"Solution produces different output for {file}")
@@ -301,7 +334,8 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     return is_correct
 
 
-def get_result(s: requests.Session, submission_id: int) -> tuple[str, str, str]:
+def get_result(s: requests.Session,
+               submission_id: int) -> tuple[str, str, str]:
     r = s.get(f'https://open.kattis.com/submissions/{submission_id}')
     soup = BeautifulSoup(r.text, features='lxml')
     result = soup.find('div', class_='status').text
@@ -375,6 +409,7 @@ def main():
         index = min(index, len(probs) - 1)
         show_prob(probs[index])
         prob = probs[index]
+        print(index, len(probs))
 
     @register_command(Command("(p)revious", "go to previous question", ["P"]))
     def cmd_prev(*_: str):
@@ -385,7 +420,8 @@ def main():
         # Need to repopulate samples of previous problem
         download_samples(s, prob.path)
 
-    @register_command(Command("(>)/skip", "skips current question", [">", "SKIP"]))
+    @register_command(Command("(>)/skip",
+                      "skips current question", [">", "SKIP"]))
     def cmd_skip(*_: str):
         nonlocal index, prob, probs
         skipped_questions.append(prob.path)
@@ -393,16 +429,21 @@ def main():
         show_prob(probs[index])
         prob = probs[index]
 
-    @register_command(Command("(i)nfo", "show information (description and samples) of current question", ["I", "INFO"]))
+    @register_command(Command("(i)nfo",
+                              "show information (description and samples) of current question",
+                              ["I",
+                               "INFO"]))
     def cmd_info(*_: str):
         show_prob(prob)
 
-    @register_command(Command("(d)escription", "show description of current question", ["D"]))
+    @register_command(Command("(d)escription",
+                      "show description of current question", ["D"]))
     def cmd_desc(*_: str):
         os.system('clear')
         print_desc(prob)
 
-    @register_command(Command("(e)xample", "show samples of current question", ["E"]))
+    @register_command(Command("(e)xample",
+                      "show samples of current question", ["E"]))
     def cmd_example(*_: str):
         os.system('clear')
 
@@ -413,7 +454,11 @@ def main():
         for i, sample in enumerate(prob.samples):
             print_sample(sample, i)
 
-    @register_command(Command("(t)est [SOLUTION_FILE]", f"runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}", ["T"]))
+    @register_command(
+        Command(
+            "(t)est [SOLUTION_FILE]",
+            f"runs solution file against sample and checks against expected output. Default file: {SOLUTION_FILE}",
+            ["T"]))
     def cmd_test(command: str):
         if not (m := re.match(r'(t|T)(\s+(\S*))?', command)):
             return
@@ -424,11 +469,15 @@ def main():
 
         try:
             if local_test(solution_file):
-                print(f"Passed all test cases")
+                print("Passed all test cases")
         except language.ExtensionNotSupported as e:
             print(e)
 
-    @register_command(Command("(r)un [SOLUTION_FILE]", f"runs solution file against sample. Default file: {SOLUTION_FILE}", ["R"]))
+    @register_command(
+        Command(
+            "(r)un [SOLUTION_FILE]",
+            f"runs solution file against sample. Default file: {SOLUTION_FILE}",
+            ["R"]))
     def cmd_run(command: str):
         if not (m := re.match(r'(r|R)(\s+(\S*))?', command)):
             return
@@ -441,9 +490,13 @@ def main():
         except language.ExtensionNotSupported as e:
             print(e)
 
-    @register_command(Command("(s)ubmit [SOLUTION_FILE]", f"submit solution. Default file: {SOLUTION_FILE}", ["S"]))
+    @register_command(
+        Command(
+            "(s)ubmit [SOLUTION_FILE]",
+            f"submit solution. Default file: {SOLUTION_FILE}",
+            ["S"]))
     def cmd_submit(command: str):
-        if not(m := re.match(r'(s|S)(\s+(\S*))?', command)):
+        if not (m := re.match(r'(s|S)(\s+(\S*))?', command)):
             return
 
         os.system('clear')
@@ -470,7 +523,8 @@ def main():
         except language.ExtensionNotSupported as e:
             print(e)
 
-    @register_command(Command("(o)pen PROBLEM_ID", "loads the problem with the problem ID", ["O"]))
+    @register_command(Command("(o)pen PROBLEM_ID",
+                      "loads the problem with the problem ID", ["O"]))
     def cmd_open(command: str):
         if not (m := re.match(r'(o|O)\s+(\S*)', command)):
             return
@@ -492,16 +546,22 @@ def main():
 
         nonlocal prob
         prob = ConcreteProblem(
-            difficulty=difficulty, path=path, title=title, description=desc, samples=samples)
+            difficulty=difficulty,
+            path=path,
+            title=title,
+            description=desc,
+            samples=samples)
         download_samples(s, prob.path)
 
         print_desc(prob)
         for i, sample in enumerate(prob.samples, start=1):
             print_sample(sample, i)
 
-    @register_command(Command("(c)hoose SOLUTION_FILE", "sets default solution file to use when running/submitting", ['C']))
+    @register_command(Command("(c)hoose SOLUTION_FILE",
+                              "sets default solution file to use when running/submitting",
+                              ['C']))
     def cmd_choose(command: str):
-        if not(m := re.match(r'(c|C)\s+(\S+)', command)):
+        if not (m := re.match(r'(c|C)\s+(\S+)', command)):
             print("Please supply a path to the target solution file")
             return
 
@@ -514,10 +574,6 @@ def main():
         global SOLUTION_FILE
         SOLUTION_FILE = m.group(2)
 
-    def cmd_target(*_: str):
-        config.save_skipped(skipped_questions)
-        exit()
-
     @register_command(Command("(h)elp", "displays help", ["H", "?"]))
     def cmd_help(*_: str, clear=True):
         if clear:
@@ -527,7 +583,8 @@ def main():
         print(msg)
         print()
 
-    @register_command(Command("(q)uit", "exits the program", ['Q', 'EXIT', 'QUIT']))
+    @register_command(Command("(q)uit", "exits the program",
+                      ['Q', 'EXIT', 'QUIT']))
     def cmd_quit(*_: str):
         config.save_skipped(skipped_questions)
         exit()

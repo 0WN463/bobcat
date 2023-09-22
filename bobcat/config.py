@@ -40,5 +40,5 @@ def get_conf() -> tuple[ConfigParser, ConfigParser, list[str]]:
 def save_skipped(skipped_questions: list[str]):
     Path(SKIP_DIR).mkdir(parents=True, exist_ok=True)
 
-    with open(SKIP_FILE, 'w+') as f:
+    with open(SKIP_FILE, 'w+', encoding='ascii') as f:
         f.write("\n".join(skipped_questions))
