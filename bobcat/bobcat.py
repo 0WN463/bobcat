@@ -94,17 +94,32 @@ class ConcreteProblem(Problem):
     description: str
     samples: list[Sample]
 
+FILTERS = {
+        "untried": "f_untried", 
+        "partial": "f_partial-score", 
+        "tried": "f_tried", 
+        "solved": "f_solved"
+}
+ORDERS = {
+        "difficulty_category": "difficulty_data",
+        "subrat": 'submission_ratio', 
+        "name": 'title_link',
+        "fastest": 'fastest_solution', 
+        "subtot": 'submissions', 
+        "subacc": 'accepted_submissions', 
+}
 
-def get_probs(s, filters: list[str], ordering: str) -> list[Problem]:
-    filter_params = [f"show_{f}=off" for f in filters if f in [
-        "tried", "untried", "solved"]]
-    order_params = [f'order={ordering.replace("+", "%2B")}']
-    query_param = "&".join([*order_params, *filter_params])
+def get_probs(s, filters: list[str], ordering: str, page: int) -> list[Problem]:
+    filter_params = [f"{q}={'off' if f in filters else 'on'}" for f, q in FILTERS.items()]
+    ordering = ORDERS[re.sub(r'^[-+]', '', ordering)]
+    order_params = [f'order={"-" if ordering.startswith("-") else ""}{ordering}']
+    page_params = [f'page={page + 1}']
+    query_param = "&".join([*order_params, *filter_params, *page_params])
 
     PROBLEM_LIST_URL = urllib.parse.urljoin(
         HOST, f"/problems?{query_param}")
     res = s.get(PROBLEM_LIST_URL)
-
+    
     soup = BeautifulSoup(res.text, features='lxml')
 
     trs = [tr for tr in soup.table.tbody.find_all('tr')]
