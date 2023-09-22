@@ -158,8 +158,8 @@ def fetch_prob(s: requests.Session, path: str, with_details: bool = False) -> tu
 
     # We will face error trying to extract samples of "interactive" problems
     try:
-        samples = [Sample(input_=s.tr.td.extract().text.strip(),
-                          output_=s.tr.td.extract().text.strip()) for s in samples]
+        samples = [Sample(input_=s.tr.td.extract().text,
+                          output_=s.tr.td.extract().text) for s in samples]
     except Exception:
         body.text.strip(), []
 
@@ -350,17 +350,29 @@ def main():
     Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
     s = login(user, password)
-    probs = get_probs(s, Q_FILTERS, Q_ORDER)
+    probs = get_probs(s, Q_FILTERS, Q_ORDER, 0)
 
     index = 0
     probs = [p for p in probs if p.path not in skipped_questions]
     show_prob(probs[index])
     prob = probs[index]
 
-    @register_command(Command("(n)ext", "go to next question", ['N']))
-    def cmd_next(*_: str):
+    @register_command(Command("(n)ext [N=1]", "go to next N question", ['N']))
+    def cmd_next(command: str):
+        if not (m := re.match(r'(n|N)(\s+(\d*))?', command)):
+            return
+
+        os.system('clear')
+        num = m.group(3) if m.group(3) else 1
+
         nonlocal index, prob, probs
-        index += 1
+
+        if index == len(probs) - 1:
+            new_probs = get_probs(s, Q_FILTERS, Q_ORDER, 1)
+            probs.extend(new_probs)
+
+        index += int(num)
+        index = min(index, len(probs) - 1)
         show_prob(probs[index])
         prob = probs[index]
 
