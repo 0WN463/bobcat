@@ -13,7 +13,7 @@ import zipfile
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Final
+from typing import Callable, Final, overload, Literal
 import requests
 
 from bs4 import BeautifulSoup
@@ -150,7 +150,7 @@ def download_samples(
         save_to=CACHE_DIR) -> None:
     shutil.rmtree(save_to)
     Path(save_to).mkdir(parents=True, exist_ok=True)
-    sample_url: Final= urllib.parse.urljoin(
+    sample_url: Final = urllib.parse.urljoin(
         HOST, f"{path}/file/statement/samples.zip")
     r = s.get(sample_url, stream=True)
 
@@ -159,6 +159,26 @@ def download_samples(
             z.extractall(save_to)
     except Exception:
         print("No samples")
+
+
+@overload
+def fetch_prob(s: requests.Session,
+               path: str) -> tuple[str,
+                                   list[Sample]]: ...
+@overload
+def fetch_prob(s: requests.Session,
+               path: str,
+               with_details: Literal[False]) -> tuple[str,
+                                   list[Sample]]: ...
+
+
+@overload
+def fetch_prob(s: requests.Session,
+               path: str,
+               with_details: Literal[True]) -> tuple[str,
+                                            list[Sample],
+                                            str,
+                                            str]: ...
 
 
 def fetch_prob(s: requests.Session,
