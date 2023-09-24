@@ -1,29 +1,24 @@
 #!/usr/bin/env python
+
 import getpass
 import glob
-import io
 import os
 import re
-import shutil
 import subprocess
 import time
-import unicodedata
-import urllib.parse
-import zipfile
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Final, overload, Literal
-import requests
-
-from bs4 import BeautifulSoup
+from typing import Callable
 
 from . import config
+from .model import Sample, Problem, ConcreteProblem
+from . import state
 from . import language
+from . import kattis
 
 conf, secret_conf, skipped_questions = config.get_conf()
 
-HOST = conf['config']["host"]
 TIMEOUT = conf['config'].getint("timeout")
 SOLUTION_FILE = conf['config']['solution_file']
 CACHE_DIR = conf['config']['cache']
@@ -55,194 +50,6 @@ def register_command(cmd: Command):
 
 
 LANGUAGES = language.make_languages(conf)
-
-
-class AuthError(Exception):
-    pass
-
-
-class ProblemNotFound(Exception):
-    pass
-
-
-def login(username: str, password: str):
-    LOGIN_URL = urllib.parse.urljoin(HOST, 'login')
-    s = requests.Session()
-    data = {"user": username, "password": password, "script": True}
-
-    res = s.post(LOGIN_URL, data=data)
-
-    if res.status_code != 200:
-        raise AuthError("Unable to login")
-
-    return s
-
-
-@dataclass
-class Problem:
-    title: str
-    path: str
-    difficulty: str
-
-
-@dataclass
-class Sample:
-    input_: str
-    output_: str
-
-
-@dataclass
-class ConcreteProblem(Problem):
-    description: str
-    samples: list[Sample]
-
-
-FILTERS = {
-    "untried": "f_untried",
-    "partial": "f_partial-score",
-    "tried": "f_tried",
-    "solved": "f_solved"
-}
-ORDERS = {
-    "difficulty_category": "difficulty_data",
-    "subrat": 'submission_ratio',
-    "name": 'title_link',
-    "fastest": 'fastest_solution',
-    "subtot": 'submissions',
-    "subacc": 'accepted_submissions',
-}
-
-
-def get_probs(
-        s,
-        filters: list[str],
-        ordering: str,
-        page: int) -> list[Problem]:
-    filter_params = [
-        f"{q}={'off' if f in filters else 'on'}" for f,
-        q in FILTERS.items()]
-    ordering = ORDERS[re.sub(r'^[-+]', '', ordering)]
-    order_params = [
-        f'order={"-" if ordering.startswith("-") else ""}{ordering}']
-    page_params = [f'page={page + 1}']
-    query_param = "&".join([*order_params, *filter_params, *page_params])
-
-    url: Final = urllib.parse.urljoin(
-        HOST, f"/problems?{query_param}")
-    res = s.get(url)
-
-    soup = BeautifulSoup(res.text, features='lxml')
-
-    trs = list(soup.table.tbody.find_all('tr'))
-
-    return [
-        Problem(
-            title=tr.td.text,
-            path=tr.td.a['href'],
-            difficulty=tr.find(
-                'span',
-                class_='difficulty_number').text) for tr in trs]
-
-
-def download_samples(
-        s: requests.Session,
-        path: str,
-        save_to=CACHE_DIR) -> None:
-    shutil.rmtree(save_to)
-    Path(save_to).mkdir(parents=True, exist_ok=True)
-    sample_url: Final = urllib.parse.urljoin(
-        HOST, f"{path}/file/statement/samples.zip")
-    r = s.get(sample_url, stream=True)
-
-    try:
-        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-            z.extractall(save_to)
-    except Exception:
-        print("No samples")
-
-
-@overload
-def fetch_prob(s: requests.Session,
-               path: str) -> tuple[str,
-                                   list[Sample]]: ...
-@overload
-def fetch_prob(s: requests.Session,
-               path: str,
-               with_details: Literal[False]) -> tuple[str,
-                                   list[Sample]]: ...
-
-
-@overload
-def fetch_prob(s: requests.Session,
-               path: str,
-               with_details: Literal[True]) -> tuple[str,
-                                            list[Sample],
-                                            str,
-                                            str]: ...
-
-
-def fetch_prob(s: requests.Session,
-               path: str,
-               with_details: bool = False) -> tuple[str,
-                                                    list[Sample]] | tuple[str,
-                                                                          list[Sample],
-                                                                          str,
-                                                                          str]:
-    r = s.get(f"https://open.kattis.com{path}")
-    soup = BeautifulSoup(r.text, features='lxml')
-    if '404' in soup.find('title').text:
-        raise ProblemNotFound("Problem not found")
-
-    body = soup.find('div', {'class': 'problembody'})
-
-    samples = [t.extract() for t in body.find_all(class_='sample')]
-    _ = [s.tr.extract() for s in samples]
-
-    # We will face error trying to extract samples of "interactive" problems
-    try:
-        samples = [Sample(input_=s.tr.td.extract().text,
-                          output_=s.tr.td.extract().text) for s in samples]
-    except Exception:
-        body.text.strip(), []
-
-    for p in body.find_all('p'):
-        p.replace_with(re.sub(r'\s+', ' ', p.text))
-
-    if with_details:
-        return body.text.strip(), samples, soup.find(
-            'span', {
-                'class': 'difficulty_number'}).text.strip(), soup.find(
-            'h1', {
-                'class': 'book-page-heading'}).text.strip()
-
-    return body.text.strip(), samples
-
-
-def submit(s: requests.Session, problem_path, source_file) -> int:
-    with open(os.path.expanduser(source_file), 'r') as f:
-        source = f.read()
-
-    file_name = Path(source_file).name
-    lang = LANGUAGES.get_lang(source_file)
-
-    prob = problem_path.replace('/problems/', '')
-    code_file = {"code": source, "filename": file_name,
-                 "id": 0, "session": None}
-    data = {"files": [code_file],
-            "language": lang.name,
-            "problem": prob,
-            "mainclass": "",
-            "submit": True,
-            }
-
-    r = s.post(f"https://open.kattis.com{problem_path}/submit", json=data)
-
-    m = re.match(r'Submission received\. Submission ID: (\d+)\.', r.text)
-
-    if not m:
-        raise ValueError("Unable to submit solution")
-
-    return int(m.group(1))
 
 
 def local_run(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR):
@@ -354,18 +161,6 @@ def local_test(solution_file=SOLUTION_FILE, test_case_dir=CACHE_DIR) -> bool:
     return is_correct
 
 
-def get_result(s: requests.Session,
-               submission_id: int) -> tuple[str, str, str]:
-    r = s.get(f'https://open.kattis.com/submissions/{submission_id}')
-    soup = BeautifulSoup(r.text, features='lxml')
-    result = soup.find('div', class_='status').text
-    time_taken = soup.find('td', {'data-type': 'cpu'}).text
-    time_taken = unicodedata.normalize("NFKD", time_taken)
-    test_cases = soup.find(
-        'div', class_='horizontal_item').find_all(text=True)[0]
-    return result, test_cases, time_taken
-
-
 def main():
     def print_desc(prob: ConcreteProblem):
         print(f"{prob.path}")
@@ -385,9 +180,9 @@ def main():
     def show_prob(prob: Problem | ConcreteProblem):
         os.system('clear')
         if not isinstance(prob, ConcreteProblem):
-            download_samples(s, prob.path)
+            kattis.download_samples(s, prob.path)
 
-            desc, samples = fetch_prob(s, prob.path)
+            desc, samples = kattis.fetch_prob(s, prob.path)
             prob = ConcreteProblem(
                 **prob.__dict__, description=desc, samples=samples)
             probs[index] = prob
@@ -396,18 +191,17 @@ def main():
         for i, sample in enumerate(prob.samples, start=1):
             print_sample(sample, i)
 
+    Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+
     has_cred = secret_conf.has_section(
         'credentials') and 'user' in secret_conf['credentials'] and 'password' in secret_conf['credentials']
     user = secret_conf['credentials']['user'] if has_cred else input("User: ")
     password = secret_conf['credentials']['password'] if has_cred else getpass.getpass(
     )
-    Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
-    s = login(user, password)
-    probs = get_probs(s, Q_FILTERS, Q_ORDER, 0)
-
+    s = kattis.login(user, password)
+    probs = [p for p in kattis.get_probs(s, Q_FILTERS, Q_ORDER, 0) if p.path not in skipped_questions]
     index = 0
-    probs = [p for p in probs if p.path not in skipped_questions]
     show_prob(probs[index])
     prob = probs[index]
 
@@ -422,7 +216,7 @@ def main():
         nonlocal index, prob, probs
 
         if index == len(probs) - 1:
-            new_probs = get_probs(s, Q_FILTERS, Q_ORDER, 1)
+            new_probs = kattis.get_probs(s, Q_FILTERS, Q_ORDER, 1)
             probs.extend(new_probs)
 
         index += int(num)
@@ -438,7 +232,7 @@ def main():
         show_prob(probs[index])
         prob = probs[index]
         # Need to repopulate samples of previous problem
-        download_samples(s, prob.path)
+        kattis.download_samples(s, prob.path)
 
     @register_command(Command("(>)/skip",
                       "skips current question", [">", "SKIP"]))
@@ -528,10 +322,11 @@ def main():
                 if input("Submit anyways? (y/N): ").upper() != 'Y':
                     return
 
-            submission_id = submit(s, prob.path, solution_file)
+            submission_id = kattis.submit(
+                s, prob.path, solution_file, LANGUAGES)
             print(f"Submitted. ID: {submission_id}")
 
-            while result := get_result(s, submission_id):
+            while result := kattis.get_result(s, submission_id):
                 status, test_cases, _ = result
                 print(f"{status}: ({test_cases})")
                 if status not in ['Running', 'New', 'Compiling']:
@@ -558,9 +353,9 @@ def main():
         path = f"/problems/{m.group(2)}"
 
         try:
-            desc, samples, difficulty, title = fetch_prob(
+            desc, samples, difficulty, title = kattis.fetch_prob(
                 s, path, with_details=True)
-        except ProblemNotFound:
+        except kattis.ProblemNotFound:
             print(f"No problems found that has a ID of {m.group(2)}")
             return
 
@@ -571,7 +366,7 @@ def main():
             title=title,
             description=desc,
             samples=samples)
-        download_samples(s, prob.path)
+        kattis.download_samples(s, prob.path)
 
         print_desc(prob)
         for i, sample in enumerate(prob.samples, start=1):
@@ -610,6 +405,8 @@ def main():
         exit()
 
     while True:
+        curr_state = state.State(s, probs, index, prob)
+        print(curr_state)
         key = input("Enter command: ")
         keyword = key.split(" ")[0].upper()
 
