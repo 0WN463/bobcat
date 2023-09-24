@@ -1,25 +1,27 @@
-from urllib.parse import urljoin
-import requests
+import io
 import os
 import re
-from pathlib import Path
-import unicodedata
 import shutil
-import io
+import unicodedata
 import zipfile
 
+from pathlib import Path
+from urllib.parse import urljoin
 from typing import overload, Literal, Final
+
+import requests
+from bs4 import BeautifulSoup
 
 from . import config
 from .language import Languages
 from .model import Sample, Problem
 
-from bs4 import BeautifulSoup
 
 conf, secret_conf, skipped_questions = config.get_conf()
 
 HOST = conf['config']["host"]
 CACHE_DIR = conf['config']['cache']
+
 
 class ProblemNotFound(Exception):
     pass
@@ -143,6 +145,7 @@ def get_result(s: requests.Session,
         'div', class_='horizontal_item').find_all(text=True)[0]
     return result, test_cases, time_taken
 
+
 def download_samples(
         s: requests.Session,
         path: str,
@@ -159,13 +162,14 @@ def download_samples(
     except Exception:
         print("No samples")
 
+
 FILTERS: Final[dict[str, str]] = {
     "untried": "f_untried",
     "partial": "f_partial-score",
     "tried": "f_tried",
     "solved": "f_solved"
 }
-ORDERS: Final[dict[str,str]] = {
+ORDERS: Final[dict[str, str]] = {
     "difficulty_category": "difficulty_data",
     "subrat": 'submission_ratio',
     "name": 'title_link',
@@ -174,8 +178,9 @@ ORDERS: Final[dict[str,str]] = {
     "subacc": 'accepted_submissions',
 }
 
+
 def get_probs(
-        s,
+        s: requests.Session,
         filters: list[str],
         ordering: str,
         page: int) -> list[Problem]:
@@ -203,4 +208,3 @@ def get_probs(
             difficulty=tr.find(
                 'span',
                 class_='difficulty_number').text) for tr in trs]
-

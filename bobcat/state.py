@@ -3,12 +3,16 @@ from requests import Session
 
 from . import model
 
+
 @dataclass
 class State:
     session: Session
-    problems: list[model.Problem]
+    problems: list[model.Problem | model.ConcreteProblem]
     index: int
-    curr_prob: model.Problem
+    curr_prob: model.ConcreteProblem
 
     def __str__(self):
         return f"{len(self.problems)} problems. index: {self.index}. prob: {self.curr_prob.path}"
+
+    def with_index(self, idx: int):
+        return State(self.session, self.problems, idx, self.problems[idx])
