@@ -43,10 +43,9 @@ def main():
         for cmd in command.COMMANDS:
             if keyword in cmd.keywords:
                 curr_state = cmd.func(curr_state, usr_input)
-                print(curr_state)
                 break
         else:
             os.system('clear')
             print(f'"{usr_input}" is not a valid command\n')
-            command.cmd_help(curr_state, clear=False)
+            command.cmd_help(curr_state, usr_input, clear=False)
             continue
