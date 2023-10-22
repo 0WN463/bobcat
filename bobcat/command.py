@@ -69,7 +69,8 @@ def cmd_next(s: state.State, command: str) -> state.State:
     num = m.group(3) if m.group(3) else 1
 
     if s.index == len(s.problems) - 1:
-        new_probs = kattis.get_probs(s.session, Q_FILTERS, Q_ORDER, 1)
+        new_probs = kattis.get_probs(s.session, Q_FILTERS, Q_ORDER, s.page + 1)
+        s.page += 1
         s.problems.extend(new_probs)
 
     index = min(s.index + int(num), len(s.problems) - 1)
@@ -244,7 +245,7 @@ def cmd_open(s: state.State, command: str) -> state.State:
     for i, sample in enumerate(prob.samples, start=1):
         print_sample(sample, i)
 
-    return state.State(s.session, s.problems, s.index, prob)
+    return state.State(s.session, s.problems, s.index, prob, s.page)
 
 
 @register_command(CommandMeta("(c)hoose SOLUTION_FILE",

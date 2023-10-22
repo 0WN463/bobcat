@@ -4,15 +4,20 @@ from pathlib import Path
 
 
 if 'XDG_CONFIG_HOME' in os.environ:
-    CONFIG_DIR = os.path.join(os.environ.get('XDG_CONFIG_HOME'), 'bobcat')
+    CONFIG_DIR = os.path.join(os.environ['XDG_CONFIG_HOME'], 'bobcat')
     CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.ini')
 else:
     CONFIG_DIR = Path.home()
     CONFIG_FILE = os.path.join(CONFIG_DIR, '.bobcat.ini')
 
-SKIP_DIR = os.path.join(os.environ.get('XDG_STATE_HOME'), 'bobcat') \
-    if 'XDG_STATE_HOME' in os.environ \
-    else os.path.join(Path.home(), '.local', 'state', 'bobcat')
+SKIP_DIR = os.path.join(
+    os.environ.get(
+        'XDG_STATE_HOME',
+        os.path.join(
+            Path.home(),
+            '.local',
+            'state')),
+    'bobcat')
 
 SKIP_FILE = os.path.join(SKIP_DIR, 'skipped')
 

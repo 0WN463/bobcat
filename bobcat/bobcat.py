@@ -33,13 +33,12 @@ def main():
             Q_FILTERS,
             Q_ORDER,
             0) if p.path not in skipped_questions]
-    curr_state = state.State(s, probs, 0, probs[0])
+    curr_state = state.State(s, probs, 0, probs[0], 0)
     command.show_prob(curr_state)
 
     while True:
         usr_input = input("Enter command: ")
         keyword = usr_input.split(" ")[0].upper()
-
         for cmd in command.COMMANDS:
             if keyword in cmd.keywords:
                 curr_state = cmd.func(curr_state, usr_input)
