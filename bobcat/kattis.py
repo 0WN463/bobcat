@@ -32,12 +32,20 @@ class AuthError(Exception):
 
 
 def login(username: str, password: str):
-    LOGIN_URL = urljoin(HOST, 'login')
+    LOGIN_URL = urljoin(HOST, 'login/email?')
     s = requests.Session()
-    data = {"user": username, "password": password, "script": True}
+
+    res = s.get(LOGIN_URL)
+    soup = BeautifulSoup(res.text, features='lxml')
+
+    csrf = soup.find('input', {'name': 'csrf_token'})['value']
+    data = {
+        "user": username,
+        "password": password,
+        "csrf_token": csrf,
+    }
 
     res = s.post(LOGIN_URL, data=data)
-
     if res.status_code != 200:
         raise AuthError("Unable to login")
 
@@ -195,11 +203,13 @@ def get_probs(
 
     url: Final = urljoin(
         HOST, f"/problems?{query_param}")
+
     res = s.get(url)
 
     soup = BeautifulSoup(res.text, features='lxml')
 
-    trs = list(soup.table.tbody.find_all('tr'))
+    problems_table = soup.find_all("table", class_="table2")[1]
+    trs = list(problems_table.find_all('tr'))[1:]
 
     return [
         Problem(
