@@ -74,13 +74,12 @@ def submit(
             }
 
     r = s.post(f"https://open.kattis.com{problem_path}/submit", json=data)
+    json = r.json()
 
-    m = re.match(r'Submission received\. Submission ID: (\d+)\.', r.text)
-
-    if not m:
+    if not json["success"]:
         raise ValueError("Unable to submit solution")
 
-    return int(m.group(1))
+    return json["submission_id"]
 
 
 @overload
