@@ -18,3 +18,9 @@ class Problem:
 class ConcreteProblem(Problem):
     description: str
     samples: list[Sample]
+
+
+@dataclass
+class SearchProblem:
+    title: str
+    path: str

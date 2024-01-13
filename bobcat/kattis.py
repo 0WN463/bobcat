@@ -6,7 +6,7 @@ import unicodedata
 import zipfile
 
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 from typing import overload, Literal, Final
 
 import requests
@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 
 from . import config
 from .language import Languages
-from .model import Sample, Problem
+from .model import Sample, Problem, SearchProblem
 
 
 conf, secret_conf, skipped_questions = config.get_conf()
@@ -217,3 +217,25 @@ def get_probs(
             difficulty=tr.find(
                 'span',
                 class_='difficulty_number').text) for tr in trs]
+
+
+def find_probs(
+        s: requests.Session,
+        term: str) -> list[SearchProblem]:
+    url: Final = urljoin(
+        HOST, f"/search?q={quote(term)}")
+
+    res = s.get(url)
+
+    soup = BeautifulSoup(res.text, features='lxml')
+    table = soup.find(class_='search-results-table')
+    if table is None:
+        return []
+
+    trs = list(table.find_all('tr'))
+
+    return [
+        SearchProblem(
+            title=tr.findAll('td')[1].text.strip(),
+            path=tr.td.a['href'],
+        ) for tr in trs]

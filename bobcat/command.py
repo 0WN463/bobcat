@@ -248,6 +248,28 @@ def cmd_open(s: state.State, command: str) -> state.State:
     return state.State(s.session, s.problems, s.index, prob, s.page)
 
 
+@register_command(CommandMeta("(f)ind search term",
+                  "searches for problems with the search term", ["F"]))
+def cmd_find(s: state.State, command: str) -> state.State:
+    if not (m := re.match(r'(f|F)\s+(\S*)', command)):
+        return s
+
+    os.system('clear')
+
+    if not m.group(2):
+        print("Search term required")
+        return s
+
+    term = m.group(2)
+
+    probs = kattis.find_probs(s.session, term)
+
+    for p in probs:
+        print(f"{p.title:<40} {p.path.removeprefix('/problems/')}")
+
+    return s
+
+
 @register_command(CommandMeta("(c)hoose SOLUTION_FILE",
                               "sets default solution file to use when running/submitting",
                               ['C']))
