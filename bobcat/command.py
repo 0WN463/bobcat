@@ -199,14 +199,26 @@ def cmd_submit(s: state.State, command: str) -> None:
             s.session, s.curr_prob.path, solution_file, LANGUAGES)
         print(f"Submitted. ID: {submission_id}")
 
+        spinner = "-\\|-/|\\"
+        spinner_index = 0
+        ran = False
         while result := kattis.get_result(s.session, submission_id):
             status, test_cases, _ = result
-            print(f"{status}: ({test_cases})")
+            spinner_index = (spinner_index + 1) % len(spinner)
+
             if status not in ['Running', 'New', 'Compiling']:
                 break
 
+            if not ran:
+                print(f"{status}: ({test_cases}) {spinner[spinner_index]}", end="")
+            else:
+                print(f"\r{status}: ({test_cases}) {spinner[spinner_index]}", end = "")
+
+            ran = True
+
             time.sleep(1)
 
+        print("")
         print(result)
     except language.ExtensionNotSupported as e:
         print(e)
@@ -305,11 +317,28 @@ def cmd_quit(_: state.State, *__) -> None:
     exit()
 
 
+latex_regex = re.compile(r'(?<!\\)\$(.*?)(?<!\\)\$')
+
+def match_to_unicode(m: re.Match[str]) -> str:
+    s = m.group(1)
+
+    if not s:
+        return ""
+
+    try:
+        import unicodeit
+    except ImportError:
+        return s
+
+    s = re.sub(r"\s", "", s)
+
+    return unicodeit.replace(s)
+
 def print_desc(prob: model.ConcreteProblem):
     print(f"{prob.path}")
     print(f"{prob.title} ({prob.difficulty})")
     print()
-    print(prob.description)
+    print(latex_regex.sub(match_to_unicode, prob.description))
     print()
 
 
