@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bobcat"
+version = "0.0.1"
+dependencies = [
+  "requests",
+  "lxml",
+  "beautifulsoup4",
+]
+requires-python = ">=3.8"
+authors = [
+  {name = "0WN463"}
+]
+maintainers = [
+  {name = "0WN463"}
+]
+license = {file = "LICENSE"}
+description = "CLI script for browsing and submitting problems on Kattis"
+readme = "README.md"
+classifiers = [
+  "Programming Language :: Python",
+]
+
+[project.optional-dependencies]
+unicode = [
+  "unicodeit",
+]
+
+[project.urls]
+Repository = "https://github.com/0WN463/bobcat"
+
+[project.scripts]
+bobcat = "bobcat.bobcat:main"
