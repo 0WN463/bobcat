@@ -199,7 +199,7 @@ def cmd_submit(s: state.State, command: str) -> None:
             s.session, s.curr_prob.path, solution_file, LANGUAGES)
         print(f"Submitted. ID: {submission_id}")
 
-        spinner = "-\\|-/|\\"
+        spinner = "-\\|/-\\|/"
         spinner_index = 0
         ran = False
         while result := kattis.get_result(s.session, submission_id):
