@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm>=8.0"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,3 +34,6 @@ Repository = "https://github.com/0WN463/bobcat"
 
 [project.scripts]
 bobcat = "bobcat.bobcat:main"
+
+[tool.setuptools.package-data]
+mypkg = ["*.ini"]
